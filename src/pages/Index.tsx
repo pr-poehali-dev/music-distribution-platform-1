@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from '@/hooks/use-toast';
 import Icon from '@/components/ui/icon';
+import { AISupportChat } from '@/components/AISupportChat';
 
 interface User {
   artistName: string;
@@ -71,30 +72,6 @@ const Index = () => {
     { name: 'Deezer', icon: 'Music4' }
   ];
 
-  const pricingPlans = [
-    {
-      name: 'Старт',
-      price: '990',
-      period: 'релиз',
-      features: ['1 релиз в год', 'До 10 треков', 'Базовая аналитика', 'Техподдержка'],
-      popular: false
-    },
-    {
-      name: 'Профи',
-      price: '2990',
-      period: 'год',
-      features: ['Безлимит релизов', 'Безлимит треков', 'Полная аналитика', 'Приоритетная поддержка', 'Смартлинки'],
-      popular: true
-    },
-    {
-      name: 'Лейбл',
-      price: '9990',
-      period: 'год',
-      features: ['Всё из Профи', 'До 10 артистов', 'Менеджер проектов', 'API доступ', 'Белый лейбл'],
-      popular: false
-    }
-  ];
-
   const faqs = [
     {
       q: 'Сколько времени занимает публикация?',
@@ -106,7 +83,7 @@ const Index = () => {
     },
     {
       q: 'Как происходит выплата роялти?',
-      a: 'Выплаты ежемесячно от 4000₽. Поддерживаем карты РФ, PayPal, банковские переводы.'
+      a: 'Выплаты ежемесячно от 100₽. Поддерживаем карты РФ, PayPal, банковские переводы.'
     },
     {
       q: 'Могу ли я удалить релиз после публикации?',
@@ -178,15 +155,12 @@ const Index = () => {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Icon name="Disc3" className="text-primary" size={28} />
-            <span className="font-bold text-xl">MusicDist</span>
+            <span className="font-bold text-xl">OLPROD</span>
           </div>
 
           <nav className="hidden md:flex items-center gap-6">
             <button onClick={() => setActiveSection('home')} className="text-sm font-medium hover:text-primary transition-colors">
               Главная
-            </button>
-            <button onClick={() => setActiveSection('pricing')} className="text-sm font-medium hover:text-primary transition-colors">
-              Тарифы
             </button>
             <button onClick={() => setActiveSection('platforms')} className="text-sm font-medium hover:text-primary transition-colors">
               Платформы
@@ -196,12 +170,6 @@ const Index = () => {
             </button>
             <button onClick={() => setActiveSection('faq')} className="text-sm font-medium hover:text-primary transition-colors">
               FAQ
-            </button>
-            <button onClick={() => setActiveSection('blog')} className="text-sm font-medium hover:text-primary transition-colors">
-              Блог
-            </button>
-            <button onClick={() => setActiveSection('support')} className="text-sm font-medium hover:text-primary transition-colors">
-              Поддержка
             </button>
           </nav>
 
@@ -357,7 +325,7 @@ const Index = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold">1,890₽</div>
-                  <p className="text-xs text-muted-foreground mt-1">Доступно к выводу</p>
+                  <p className="text-xs text-muted-foreground mt-1">Мин. вывод: 100₽</p>
                 </CardContent>
               </Card>
               <Card>
@@ -570,53 +538,13 @@ const Index = () => {
                         <CardTitle>Прозрачные выплаты</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-muted-foreground">Выводите роялти от 4000₽ на карту или PayPal</p>
+                        <p className="text-muted-foreground">Выводите роялти от 100₽ на карту или PayPal</p>
                       </CardContent>
                     </Card>
                   </div>
                 </div>
               </section>
             </>
-          )}
-
-          {activeSection === 'pricing' && (
-            <section className="py-16">
-              <div className="container mx-auto px-4">
-                <div className="text-center mb-12">
-                  <h2 className="text-3xl md:text-4xl font-bold mb-4">Тарифы</h2>
-                  <p className="text-muted-foreground text-lg">Выберите план под ваши задачи</p>
-                </div>
-                <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-                  {pricingPlans.map((plan) => (
-                    <Card key={plan.name} className={plan.popular ? 'border-primary border-2 relative' : ''}>
-                      {plan.popular && (
-                        <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">Популярный</Badge>
-                      )}
-                      <CardHeader>
-                        <CardTitle className="text-2xl">{plan.name}</CardTitle>
-                        <CardDescription>
-                          <span className="text-3xl font-bold text-foreground">{plan.price}₽</span>
-                          <span className="text-muted-foreground">/{plan.period}</span>
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <ul className="space-y-3">
-                          {plan.features.map((feature) => (
-                            <li key={feature} className="flex items-start gap-2">
-                              <Icon name="Check" className="text-primary mt-0.5" size={18} />
-                              <span className="text-sm">{feature}</span>
-                            </li>
-                          ))}
-                        </ul>
-                        <Button className="w-full mt-6" variant={plan.popular ? 'default' : 'outline'}>
-                          Выбрать план
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            </section>
           )}
 
           {activeSection === 'platforms' && (
@@ -703,110 +631,41 @@ const Index = () => {
               </div>
             </section>
           )}
-
-          {activeSection === 'blog' && (
-            <section className="py-16">
-              <div className="container mx-auto px-4">
-                <div className="text-center mb-12">
-                  <h2 className="text-3xl md:text-4xl font-bold mb-4">Блог</h2>
-                  <p className="text-muted-foreground text-lg">Полезные статьи для артистов</p>
-                </div>
-                <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-                  {[
-                    { title: 'Как оптимизировать обложку релиза', category: 'Маркетинг' },
-                    { title: '5 ошибок при загрузке треков', category: 'Инструкции' },
-                    { title: 'Правила модерации на стримингах', category: 'Гайды' }
-                  ].map((post, idx) => (
-                    <Card key={idx} className="hover:shadow-lg transition-shadow cursor-pointer">
-                      <div className="h-40 bg-gradient-to-br from-primary/20 to-secondary/20"></div>
-                      <CardHeader>
-                        <Badge variant="secondary" className="w-fit mb-2">{post.category}</Badge>
-                        <CardTitle className="text-lg">{post.title}</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground">15 ноября 2024</p>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            </section>
-          )}
-
-          {activeSection === 'support' && (
-            <section className="py-16">
-              <div className="container mx-auto px-4 max-w-3xl">
-                <div className="text-center mb-12">
-                  <h2 className="text-3xl md:text-4xl font-bold mb-4">Поддержка</h2>
-                  <p className="text-muted-foreground text-lg">Мы всегда на связи</p>
-                </div>
-                <div className="grid md:grid-cols-2 gap-6">
-                  <Card>
-                    <CardHeader>
-                      <Icon name="MessageCircle" className="text-primary mb-2" size={28} />
-                      <CardTitle>Чат поддержки</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-muted-foreground mb-4">Ответим в течение 2 часов</p>
-                      <Button className="w-full">Открыть чат</Button>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader>
-                      <Icon name="Mail" className="text-primary mb-2" size={28} />
-                      <CardTitle>Email</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-muted-foreground mb-4">support@musicdist.ru</p>
-                      <Button variant="outline" className="w-full">Написать письмо</Button>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            </section>
-          )}
         </>
       )}
 
       <footer className="border-t mt-16 py-12 bg-muted/30">
         <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-4 gap-8">
+          <div className="grid md:grid-cols-3 gap-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <Icon name="Disc3" className="text-primary" size={24} />
-                <span className="font-bold text-lg">MusicDist</span>
+                <span className="font-bold text-lg">OLPROD</span>
               </div>
               <p className="text-sm text-muted-foreground">Профессиональная дистрибуция музыки на все платформы</p>
             </div>
             <div>
-              <h4 className="font-semibold mb-4">Продукт</h4>
+              <h4 className="font-semibold mb-4">Навигация</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><button onClick={() => setActiveSection('pricing')}>Тарифы</button></li>
                 <li><button onClick={() => setActiveSection('platforms')}>Платформы</button></li>
                 <li><button onClick={() => requireAuth(() => setActiveSection('smartlinks'))}>Смартлинки</button></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Помощь</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><button onClick={() => setActiveSection('faq')}>FAQ</button></li>
-                <li><button onClick={() => setActiveSection('support')}>Поддержка</button></li>
-                <li><button onClick={() => setActiveSection('blog')}>Блог</button></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold mb-4">Контакты</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>support@musicdist.ru</li>
-                <li>+7 (495) 123-45-67</li>
+                <li>support@olprod.ru</li>
               </ul>
             </div>
           </div>
           <div className="border-t mt-8 pt-8 text-center text-sm text-muted-foreground">
-            © 2024 MusicDist. Все права защищены.
+            © 2024 OLPROD. Все права защищены.
           </div>
         </div>
       </footer>
+
+      <AISupportChat />
     </div>
   );
 };
