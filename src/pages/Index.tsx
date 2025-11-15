@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,12 +8,59 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { toast } from '@/hooks/use-toast';
 import Icon from '@/components/ui/icon';
+
+interface User {
+  artistName: string;
+  email: string;
+}
+
+interface Release {
+  id: string;
+  title: string;
+  artist: string;
+  status: 'Опубликован' | 'На проверке' | 'Черновик';
+  streams: number;
+  revenue: number;
+  genre?: string;
+  releaseDate?: string;
+  coverUrl?: string;
+}
 
 const Index = () => {
   const [activeSection, setActiveSection] = useState('home');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [isDashboard, setIsDashboard] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [theme, setTheme] = useState<'light' | 'dark' | 'crystal'>('light');
+  const [releases, setReleases] = useState<Release[]>([
+    { id: '1', title: 'Midnight Dreams', artist: '', status: 'Опубликован', streams: 12450, revenue: 1890 },
+    { id: '2', title: 'Summer Vibes EP', artist: '', status: 'На проверке', streams: 0, revenue: 0 },
+    { id: '3', title: 'Lost in Tokyo', artist: '', status: 'Черновик', streams: 0, revenue: 0 }
+  ]);
+
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [regArtistName, setRegArtistName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+
+  const [newRelease, setNewRelease] = useState({
+    title: '',
+    genre: '',
+    releaseDate: '',
+    description: '',
+    platforms: [] as string[]
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.remove('light', 'dark', 'crystal');
+    document.documentElement.classList.add(theme);
+  }, [theme]);
 
   const platforms = [
     { name: 'Spotify', icon: 'Music2' },
@@ -67,14 +114,66 @@ const Index = () => {
     }
   ];
 
-  const mockReleases = [
-    { title: 'Midnight Dreams', status: 'Опубликован', streams: 12450, revenue: 1890 },
-    { title: 'Summer Vibes EP', status: 'На проверке', streams: 0, revenue: 0 },
-    { title: 'Lost in Tokyo', status: 'Черновик', streams: 0, revenue: 0 }
-  ];
+  const handleLogin = () => {
+    if (!loginEmail || !loginPassword) {
+      toast({ title: 'Ошибка', description: 'Заполните все поля', variant: 'destructive' });
+      return;
+    }
+    setUser({ artistName: 'DJ Shadow', email: loginEmail });
+    setIsAuthOpen(false);
+    toast({ title: 'Успешно!', description: 'Вы вошли в систему' });
+  };
+
+  const handleRegister = () => {
+    if (!regArtistName || !regEmail || !regPassword) {
+      toast({ title: 'Ошибка', description: 'Заполните все поля', variant: 'destructive' });
+      return;
+    }
+    setUser({ artistName: regArtistName, email: regEmail });
+    setIsAuthOpen(false);
+    toast({ title: 'Успешно!', description: `Добро пожаловать, ${regArtistName}!` });
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setActiveSection('home');
+    toast({ title: 'Выход', description: 'Вы вышли из системы' });
+  };
+
+  const handleUploadRelease = () => {
+    if (!newRelease.title || !newRelease.genre) {
+      toast({ title: 'Ошибка', description: 'Заполните обязательные поля', variant: 'destructive' });
+      return;
+    }
+
+    const release: Release = {
+      id: Date.now().toString(),
+      title: newRelease.title,
+      artist: user?.artistName || '',
+      status: 'Черновик',
+      streams: 0,
+      revenue: 0,
+      genre: newRelease.genre,
+      releaseDate: newRelease.releaseDate
+    };
+
+    setReleases([release, ...releases]);
+    setIsUploadOpen(false);
+    setNewRelease({ title: '', genre: '', releaseDate: '', description: '', platforms: [] });
+    toast({ title: 'Релиз создан!', description: 'Загрузите аудио и обложку для отправки на модерацию' });
+  };
+
+  const requireAuth = (action: () => void) => {
+    if (!user) {
+      toast({ title: 'Требуется авторизация', description: 'Войдите или зарегистрируйтесь', variant: 'destructive' });
+      setIsAuthOpen(true);
+      return;
+    }
+    action();
+  };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background transition-colors duration-300">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -92,7 +191,7 @@ const Index = () => {
             <button onClick={() => setActiveSection('platforms')} className="text-sm font-medium hover:text-primary transition-colors">
               Платформы
             </button>
-            <button onClick={() => setActiveSection('smartlinks')} className="text-sm font-medium hover:text-primary transition-colors">
+            <button onClick={() => requireAuth(() => setActiveSection('smartlinks'))} className="text-sm font-medium hover:text-primary transition-colors">
               Смартлинки
             </button>
             <button onClick={() => setActiveSection('faq')} className="text-sm font-medium hover:text-primary transition-colors">
@@ -107,7 +206,29 @@ const Index = () => {
           </nav>
 
           <div className="flex items-center gap-3">
-            {!isDashboard ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Icon name="Palette" size={18} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setTheme('light')}>
+                  <Icon name="Sun" size={16} className="mr-2" />
+                  Светлая
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme('dark')}>
+                  <Icon name="Moon" size={16} className="mr-2" />
+                  Тёмная
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme('crystal')}>
+                  <Icon name="Sparkles" size={16} className="mr-2" />
+                  Кристальная
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {!user ? (
               <>
                 <Dialog open={isAuthOpen} onOpenChange={setIsAuthOpen}>
                   <DialogTrigger asChild>
@@ -126,54 +247,266 @@ const Index = () => {
                       <TabsContent value="login" className="space-y-4">
                         <div className="space-y-2">
                           <Label htmlFor="email">Email</Label>
-                          <Input id="email" type="email" placeholder="your@email.com" />
+                          <Input 
+                            id="email" 
+                            type="email" 
+                            placeholder="your@email.com"
+                            value={loginEmail}
+                            onChange={(e) => setLoginEmail(e.target.value)}
+                          />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="password">Пароль</Label>
-                          <Input id="password" type="password" />
+                          <Input 
+                            id="password" 
+                            type="password"
+                            value={loginPassword}
+                            onChange={(e) => setLoginPassword(e.target.value)}
+                          />
                         </div>
-                        <Button className="w-full" onClick={() => { setIsAuthOpen(false); setIsDashboard(true); }}>
+                        <Button className="w-full" onClick={handleLogin}>
                           Войти
                         </Button>
                       </TabsContent>
                       <TabsContent value="register" className="space-y-4">
                         <div className="space-y-2">
-                          <Label htmlFor="artist">Имя артиста</Label>
-                          <Input id="artist" placeholder="DJ Shadow" />
+                          <Label htmlFor="artist">Псевдоним артиста *</Label>
+                          <Input 
+                            id="artist" 
+                            placeholder="DJ Shadow"
+                            value={regArtistName}
+                            onChange={(e) => setRegArtistName(e.target.value)}
+                          />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="reg-email">Email</Label>
-                          <Input id="reg-email" type="email" placeholder="your@email.com" />
+                          <Label htmlFor="reg-email">Email *</Label>
+                          <Input 
+                            id="reg-email" 
+                            type="email" 
+                            placeholder="your@email.com"
+                            value={regEmail}
+                            onChange={(e) => setRegEmail(e.target.value)}
+                          />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="reg-password">Пароль</Label>
-                          <Input id="reg-password" type="password" />
+                          <Label htmlFor="reg-password">Пароль *</Label>
+                          <Input 
+                            id="reg-password" 
+                            type="password"
+                            value={regPassword}
+                            onChange={(e) => setRegPassword(e.target.value)}
+                          />
                         </div>
-                        <Button className="w-full" onClick={() => { setIsAuthOpen(false); setIsDashboard(true); }}>
+                        <Button className="w-full" onClick={handleRegister}>
                           Создать аккаунт
                         </Button>
                       </TabsContent>
                     </Tabs>
                   </DialogContent>
                 </Dialog>
-                <Button size="sm">Начать бесплатно</Button>
+                <Button size="sm" onClick={() => setIsAuthOpen(true)}>Начать бесплатно</Button>
               </>
             ) : (
               <>
-                <Button variant="ghost" size="sm" onClick={() => setIsDashboard(false)}>
+                <Button variant="ghost" size="sm" onClick={() => setActiveSection('dashboard')}>
                   <Icon name="LayoutDashboard" size={18} className="mr-2" />
                   Кабинет
                 </Button>
-                <Button variant="ghost" size="icon">
-                  <Icon name="User" size={18} />
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <Icon name="User" size={18} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <div className="px-2 py-1.5 text-sm font-semibold">{user.artistName}</div>
+                    <div className="px-2 py-1 text-xs text-muted-foreground">{user.email}</div>
+                    <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                      <Icon name="LogOut" size={16} className="mr-2" />
+                      Выйти
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>
             )}
           </div>
         </div>
       </header>
 
-      {!isDashboard ? (
+      {activeSection === 'dashboard' && user ? (
+        <section className="py-8">
+          <div className="container mx-auto px-4">
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold mb-2">Личный кабинет</h1>
+              <p className="text-muted-foreground">Добро пожаловать, {user.artistName}</p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-6 mb-8">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Всего прослушиваний</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">12,450</div>
+                  <p className="text-xs text-green-600 mt-1">+18% за месяц</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Доход</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">1,890₽</div>
+                  <p className="text-xs text-muted-foreground mt-1">Доступно к выводу</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Активных релизов</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">{releases.filter(r => r.status === 'Опубликован').length}</div>
+                  <p className="text-xs text-muted-foreground mt-1">{releases.filter(r => r.status === 'На проверке').length} на модерации</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">Мои релизы</h2>
+              <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Icon name="Upload" size={18} className="mr-2" />
+                    Загрузить релиз
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Новый релиз</DialogTitle>
+                    <DialogDescription>Заполните информацию о вашем релизе</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="release-title">Название релиза *</Label>
+                      <Input 
+                        id="release-title" 
+                        placeholder="Midnight Dreams"
+                        value={newRelease.title}
+                        onChange={(e) => setNewRelease({ ...newRelease, title: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="artist-display">Артист</Label>
+                      <Input 
+                        id="artist-display" 
+                        value={user.artistName}
+                        disabled
+                        className="bg-muted"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="genre">Жанр *</Label>
+                      <Select value={newRelease.genre} onValueChange={(value) => setNewRelease({ ...newRelease, genre: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Выберите жанр" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pop">Pop</SelectItem>
+                          <SelectItem value="rock">Rock</SelectItem>
+                          <SelectItem value="electronic">Electronic</SelectItem>
+                          <SelectItem value="hip-hop">Hip-Hop</SelectItem>
+                          <SelectItem value="jazz">Jazz</SelectItem>
+                          <SelectItem value="classical">Classical</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="release-date">Дата релиза</Label>
+                      <Input 
+                        id="release-date" 
+                        type="date"
+                        value={newRelease.releaseDate}
+                        onChange={(e) => setNewRelease({ ...newRelease, releaseDate: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Описание</Label>
+                      <Textarea 
+                        id="description" 
+                        placeholder="Расскажите о релизе..."
+                        value={newRelease.description}
+                        onChange={(e) => setNewRelease({ ...newRelease, description: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Аудио файл (WAV/MP3)</Label>
+                      <div className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-accent/50 transition-colors cursor-pointer">
+                        <Icon name="Upload" className="mx-auto mb-2 text-muted-foreground" size={32} />
+                        <p className="text-sm text-muted-foreground">Нажмите для загрузки или перетащите файл</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Обложка (3000×3000px)</Label>
+                      <div className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-accent/50 transition-colors cursor-pointer">
+                        <Icon name="Image" className="mx-auto mb-2 text-muted-foreground" size={32} />
+                        <p className="text-sm text-muted-foreground">Нажмите для загрузки или перетащите файл</p>
+                      </div>
+                    </div>
+                    <Button className="w-full" onClick={handleUploadRelease}>
+                      Создать релиз
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <div className="space-y-4">
+              {releases.map((release) => (
+                <Card key={release.id}>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 bg-gradient-to-br from-primary/30 to-secondary/30 rounded-lg flex items-center justify-center">
+                          <Icon name="Music" className="text-primary" size={28} />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg">{release.title}</h3>
+                          <p className="text-sm text-muted-foreground mb-1">{user.artistName}</p>
+                          <div className="flex items-center gap-3">
+                            <Badge variant={release.status === 'Опубликован' ? 'default' : 'secondary'}>
+                              {release.status}
+                            </Badge>
+                            {release.status === 'Опубликован' && (
+                              <span className="text-sm text-muted-foreground">
+                                {release.streams.toLocaleString()} прослушиваний
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {release.status === 'Опубликован' ? (
+                          <>
+                            <div className="text-2xl font-bold">{release.revenue}₽</div>
+                            <p className="text-xs text-muted-foreground">доход</p>
+                          </>
+                        ) : release.status === 'На проверке' ? (
+                          <div className="w-48">
+                            <p className="text-sm mb-2 text-muted-foreground">Модерация</p>
+                            <Progress value={65} />
+                          </div>
+                        ) : (
+                          <Button variant="outline">Продолжить</Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : (
         <>
           {activeSection === 'home' && (
             <>
@@ -190,7 +523,7 @@ const Index = () => {
                       Spotify, Apple Music, VK, Яндекс Музыка и ещё 150+ площадок. Загружайте релизы, получайте статистику и выводите деньги
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                      <Button size="lg" className="text-lg px-8" onClick={() => setIsAuthOpen(true)}>
+                      <Button size="lg" className="text-lg px-8" onClick={() => requireAuth(() => setIsUploadOpen(true))}>
                         Загрузить релиз
                         <Icon name="Upload" size={20} className="ml-2" />
                       </Button>
@@ -323,7 +656,7 @@ const Index = () => {
                       </div>
                       <div>
                         <Label htmlFor="artist-name">Артист</Label>
-                        <Input id="artist-name" placeholder="DJ Shadow" className="mt-2" />
+                        <Input id="artist-name" value={user?.artistName || ''} disabled className="mt-2 bg-muted" />
                       </div>
                       <div>
                         <Label>Платформы</Label>
@@ -433,97 +766,6 @@ const Index = () => {
             </section>
           )}
         </>
-      ) : (
-        <section className="py-8">
-          <div className="container mx-auto px-4">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold mb-2">Личный кабинет</h1>
-              <p className="text-muted-foreground">Управляйте релизами и следите за статистикой</p>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-6 mb-8">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Всего прослушиваний</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">12,450</div>
-                  <p className="text-xs text-green-600 mt-1">+18% за месяц</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Доход</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">1,890₽</div>
-                  <p className="text-xs text-muted-foreground mt-1">Доступно к выводу</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Активных релизов</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">1</div>
-                  <p className="text-xs text-muted-foreground mt-1">2 на модерации</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">Мои релизы</h2>
-              <Button>
-                <Icon name="Upload" size={18} className="mr-2" />
-                Загрузить релиз
-              </Button>
-            </div>
-
-            <div className="space-y-4">
-              {mockReleases.map((release, idx) => (
-                <Card key={idx}>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 bg-gradient-to-br from-primary/30 to-secondary/30 rounded-lg flex items-center justify-center">
-                          <Icon name="Music" className="text-primary" size={28} />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-lg">{release.title}</h3>
-                          <div className="flex items-center gap-3 mt-1">
-                            <Badge variant={release.status === 'Опубликован' ? 'default' : 'secondary'}>
-                              {release.status}
-                            </Badge>
-                            {release.status === 'Опубликован' && (
-                              <span className="text-sm text-muted-foreground">
-                                {release.streams.toLocaleString()} прослушиваний
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        {release.status === 'Опубликован' ? (
-                          <>
-                            <div className="text-2xl font-bold">{release.revenue}₽</div>
-                            <p className="text-xs text-muted-foreground">доход</p>
-                          </>
-                        ) : release.status === 'На проверке' ? (
-                          <div className="w-48">
-                            <p className="text-sm mb-2 text-muted-foreground">Модерация</p>
-                            <Progress value={65} />
-                          </div>
-                        ) : (
-                          <Button variant="outline">Продолжить</Button>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
       )}
 
       <footer className="border-t mt-16 py-12 bg-muted/30">
@@ -541,7 +783,7 @@ const Index = () => {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><button onClick={() => setActiveSection('pricing')}>Тарифы</button></li>
                 <li><button onClick={() => setActiveSection('platforms')}>Платформы</button></li>
-                <li><button onClick={() => setActiveSection('smartlinks')}>Смартлинки</button></li>
+                <li><button onClick={() => requireAuth(() => setActiveSection('smartlinks'))}>Смартлинки</button></li>
               </ul>
             </div>
             <div>
