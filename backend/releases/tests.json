@@ -1,0 +1,29 @@
+{
+  "tests": [
+    {
+      "name": "Get user releases",
+      "method": "GET",
+      "path": "/?userId=1",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "releases": []
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Create new release",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "userId": 1,
+        "title": "Test Release",
+        "genre": "Pop"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

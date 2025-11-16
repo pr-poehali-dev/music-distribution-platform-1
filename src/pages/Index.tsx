@@ -14,22 +14,28 @@ import { toast } from '@/hooks/use-toast';
 import Icon from '@/components/ui/icon';
 import { AISupportChat } from '@/components/AISupportChat';
 
+const API_AUTH = 'https://functions.poehali.dev/3a6da1d1-e103-4ce2-b766-907e6a900592';
+const API_RELEASES = 'https://functions.poehali.dev/ea3b8978-849d-4e2d-ae73-dec1cb43ffc2';
+
 interface User {
+  id: number;
   artistName: string;
   email: string;
 }
 
 interface Release {
-  id: string;
+  id: number;
   title: string;
-  artist: string;
-  status: 'Опубликован' | 'На проверке' | 'Черновик';
+  genre: string;
+  status: string;
   streams: number;
   revenue: number;
-  genre?: string;
   releaseDate?: string;
-  coverUrl?: string;
   description?: string;
+  musicAuthor?: string;
+  lyricsAuthor?: string;
+  audioUrl?: string;
+  coverUrl?: string;
 }
 
 interface SmartLink {
@@ -45,10 +51,14 @@ const Index = () => {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isAudioUploadOpen, setIsAudioUploadOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark' | 'crystal'>('light');
   const [releases, setReleases] = useState<Release[]>([]);
   const [smartLinks, setSmartLinks] = useState<SmartLink[]>([]);
+  const [editingRelease, setEditingRelease] = useState<Release | null>(null);
+  const [currentReleaseId, setCurrentReleaseId] = useState<number | null>(null);
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -61,8 +71,12 @@ const Index = () => {
     genre: '',
     releaseDate: '',
     description: '',
-    platforms: [] as string[]
+    musicAuthor: '',
+    lyricsAuthor: ''
   });
+
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
 
   const [newSmartLink, setNewSmartLink] = useState({
     releaseName: '',
@@ -79,6 +93,12 @@ const Index = () => {
     document.documentElement.classList.add(theme);
   }, [theme]);
 
+  useEffect(() => {
+    if (user) {
+      loadReleases();
+    }
+  }, [user]);
+
   const platforms = [
     { name: 'Spotify', icon: 'Music2' },
     { name: 'Apple Music', icon: 'Music' },
@@ -91,54 +111,262 @@ const Index = () => {
   const totalRevenue = releases.reduce((sum, r) => sum + r.revenue, 0);
   const totalStreams = releases.reduce((sum, r) => sum + r.streams, 0);
 
-  const handleLogin = () => {
+  const validateAudioFile = (file: File): boolean => {
+    if (!file.name.toLowerCase().endsWith('.wav')) {
+      toast({ 
+        title: 'Ошибка формата', 
+        description: 'Аудио должно быть в формате WAV',
+        variant: 'destructive' 
+      });
+      return false;
+    }
+    return true;
+  };
+
+  const validateCoverImage = async (file: File): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        img.src = e.target?.result as string;
+      };
+      
+      img.onload = () => {
+        if (img.width !== img.height) {
+          toast({ 
+            title: 'Ошибка размера', 
+            description: 'Обложка должна быть квадратной',
+            variant: 'destructive' 
+          });
+          resolve(false);
+        } else {
+          resolve(true);
+        }
+      };
+      
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleAudioChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && validateAudioFile(file)) {
+      setAudioFile(file);
+    }
+  };
+
+  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && await validateCoverImage(file)) {
+      setCoverFile(file);
+    }
+  };
+
+  const loadReleases = async () => {
+    if (!user) return;
+    
+    try {
+      const response = await fetch(`${API_RELEASES}?userId=${user.id}`);
+      const data = await response.json();
+      setReleases(data.releases || []);
+    } catch (error) {
+      console.error('Error loading releases:', error);
+    }
+  };
+
+  const handleLogin = async () => {
     if (!loginEmail || !loginPassword) {
       toast({ title: 'Ошибка', description: 'Заполните все поля', variant: 'destructive' });
       return;
     }
-    setUser({ artistName: 'DJ Shadow', email: loginEmail });
-    setIsAuthOpen(false);
-    toast({ title: 'Успешно!', description: 'Вы вошли в систему' });
+
+    try {
+      const response = await fetch(API_AUTH, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'login', email: loginEmail, password: loginPassword })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setUser(data.user);
+        setIsAuthOpen(false);
+        toast({ title: 'Успешно!', description: 'Вы вошли в систему' });
+      } else {
+        toast({ title: 'Ошибка', description: data.error || 'Ошибка входа', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка', description: 'Ошибка соединения', variant: 'destructive' });
+    }
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!regArtistName || !regEmail || !regPassword) {
       toast({ title: 'Ошибка', description: 'Заполните все поля', variant: 'destructive' });
       return;
     }
-    setUser({ artistName: regArtistName, email: regEmail });
-    setIsAuthOpen(false);
-    toast({ title: 'Успешно!', description: `Добро пожаловать, ${regArtistName}!` });
+
+    try {
+      const response = await fetch(API_AUTH, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'register', 
+          email: regEmail, 
+          password: regPassword,
+          artistName: regArtistName 
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setUser(data.user);
+        setIsAuthOpen(false);
+        toast({ title: 'Успешно!', description: `Добро пожаловать, ${regArtistName}!` });
+      } else {
+        toast({ title: 'Ошибка', description: data.error || 'Ошибка регистрации', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка', description: 'Ошибка соединения', variant: 'destructive' });
+    }
   };
 
   const handleLogout = () => {
     setUser(null);
+    setReleases([]);
     setActiveSection('home');
     toast({ title: 'Выход', description: 'Вы вышли из системы' });
   };
 
-  const handleUploadRelease = () => {
+  const handleUploadRelease = async () => {
     if (!newRelease.title || !newRelease.genre) {
-      toast({ title: 'Ошибка', description: 'Заполните обязательные поля', variant: 'destructive' });
+      toast({ title: 'Ошибка', description: 'Заполните все обязательные поля', variant: 'destructive' });
       return;
     }
 
-    const release: Release = {
-      id: Date.now().toString(),
-      title: newRelease.title,
-      artist: user?.artistName || '',
-      status: 'Черновик',
-      streams: 0,
-      revenue: 0,
-      genre: newRelease.genre,
-      releaseDate: newRelease.releaseDate,
-      description: newRelease.description
-    };
+    if (!user) return;
 
-    setReleases([release, ...releases]);
-    setIsUploadOpen(false);
-    setNewRelease({ title: '', genre: '', releaseDate: '', description: '', platforms: [] });
-    toast({ title: 'Релиз создан!', description: 'Загрузите аудио и обложку для отправки на модерацию' });
+    try {
+      const response = await fetch(API_RELEASES, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          ...newRelease
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setCurrentReleaseId(data.release.id);
+        setIsUploadOpen(false);
+        setIsAudioUploadOpen(true);
+        setNewRelease({ title: '', genre: '', releaseDate: '', description: '', musicAuthor: '', lyricsAuthor: '' });
+      } else {
+        toast({ title: 'Ошибка', description: data.error || 'Ошибка создания', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка', description: 'Ошибка соединения', variant: 'destructive' });
+    }
+  };
+
+  const handleUploadFiles = async () => {
+    if (!audioFile || !coverFile) {
+      toast({ title: 'Ошибка', description: 'Загрузите аудио и обложку', variant: 'destructive' });
+      return;
+    }
+
+    if (!currentReleaseId || !user) return;
+
+    toast({ title: 'Загрузка...', description: 'Файлы загружаются на сервер' });
+
+    try {
+      const response = await fetch(API_RELEASES, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          releaseId: currentReleaseId,
+          status: 'На модерации',
+          audioUrl: audioFile.name,
+          coverUrl: coverFile.name
+        })
+      });
+
+      if (response.ok) {
+        setIsAudioUploadOpen(false);
+        setAudioFile(null);
+        setCoverFile(null);
+        setCurrentReleaseId(null);
+        loadReleases();
+        toast({ title: 'Успешно!', description: 'Релиз отправлен на модерацию' });
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка', description: 'Ошибка загрузки файлов', variant: 'destructive' });
+    }
+  };
+
+  const handleEditRelease = (release: Release) => {
+    setEditingRelease(release);
+    setIsEditOpen(true);
+  };
+
+  const handleUpdateRelease = async () => {
+    if (!editingRelease || !user) return;
+
+    try {
+      const response = await fetch(API_RELEASES, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          releaseId: editingRelease.id,
+          title: editingRelease.title,
+          genre: editingRelease.genre,
+          releaseDate: editingRelease.releaseDate,
+          description: editingRelease.description,
+          musicAuthor: editingRelease.musicAuthor,
+          lyricsAuthor: editingRelease.lyricsAuthor
+        })
+      });
+
+      if (response.ok) {
+        setIsEditOpen(false);
+        setEditingRelease(null);
+        loadReleases();
+        toast({ title: 'Успешно!', description: 'Релиз обновлён' });
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка', description: 'Ошибка обновления', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteRelease = async (releaseId: number) => {
+    if (!user) return;
+
+    if (!confirm('Удалить этот релиз?')) return;
+
+    try {
+      const response = await fetch(API_RELEASES, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          releaseId: releaseId
+        })
+      });
+
+      if (response.ok) {
+        loadReleases();
+        toast({ title: 'Успешно!', description: 'Релиз удалён' });
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка', description: 'Ошибка удаления', variant: 'destructive' });
+    }
   };
 
   const handleCreateSmartLink = () => {
@@ -203,8 +431,32 @@ const Index = () => {
     <div className="min-h-screen bg-background transition-colors duration-300">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Icon name="Palette" size={18} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => setTheme('light')}>
+                  <Icon name="Sun" size={16} className="mr-2" />
+                  Светлая
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme('dark')}>
+                  <Icon name="Moon" size={16} className="mr-2" />
+                  Тёмная
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme('crystal')}>
+                  <Icon name="Sparkles" size={16} className="mr-2" />
+                  Кристальная
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveSection('home')}>
-            <img src="https://cdn.poehali.dev/projects/33951d59-5d7e-47f4-880f-c2ae98b9913e/files/48b2980d-2176-4462-8c7b-cb26e59aaf60.jpg" alt="OLPROD Logo" className="w-10 h-10 rounded-lg" />
+            <img src="https://cdn.poehali.dev/projects/33951d59-5d7e-47f4-880f-c2ae98b9913e/files/dc7a385c-d082-4a5b-89e7-4ee95e93f99c.jpg" alt="OLPROD Logo" className="w-10 h-10 rounded-lg" />
             <span className="font-bold text-xl">OLPROD</span>
           </div>
 
@@ -221,28 +473,6 @@ const Index = () => {
           </nav>
 
           <div className="flex items-center gap-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Icon name="Palette" size={18} />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setTheme('light')}>
-                  <Icon name="Sun" size={16} className="mr-2" />
-                  Светлая
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme('dark')}>
-                  <Icon name="Moon" size={16} className="mr-2" />
-                  Тёмная
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme('crystal')}>
-                  <Icon name="Sparkles" size={16} className="mr-2" />
-                  Кристальная
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
             {!user ? (
               <>
                 <Dialog open={isAuthOpen} onOpenChange={setIsAuthOpen}>
@@ -389,7 +619,7 @@ const Index = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="text-3xl font-bold">{releases.filter(r => r.status === 'Опубликован').length}</div>
-                      <p className="text-xs text-muted-foreground mt-1">{releases.filter(r => r.status === 'На проверке').length} на модерации</p>
+                      <p className="text-xs text-muted-foreground mt-1">{releases.filter(r => r.status === 'На модерации').length} на модерации</p>
                     </CardContent>
                   </Card>
                 </div>
@@ -429,7 +659,7 @@ const Index = () => {
                           Загрузить релиз
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="sm:max-w-lg">
+                      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                           <DialogTitle>Новый релиз</DialogTitle>
                           <DialogDescription>Заполните информацию о вашем релизе</DialogDescription>
@@ -479,6 +709,24 @@ const Index = () => {
                             />
                           </div>
                           <div className="space-y-2">
+                            <Label htmlFor="music-author">Автор музыки *</Label>
+                            <Input 
+                              id="music-author" 
+                              placeholder="Иван Иванов"
+                              value={newRelease.musicAuthor}
+                              onChange={(e) => setNewRelease({ ...newRelease, musicAuthor: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="lyrics-author">Автор текста *</Label>
+                            <Input 
+                              id="lyrics-author" 
+                              placeholder="Иван Иванов"
+                              value={newRelease.lyricsAuthor}
+                              onChange={(e) => setNewRelease({ ...newRelease, lyricsAuthor: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
                             <Label htmlFor="description">Описание</Label>
                             <Textarea 
                               id="description" 
@@ -487,28 +735,107 @@ const Index = () => {
                               onChange={(e) => setNewRelease({ ...newRelease, description: e.target.value })}
                             />
                           </div>
-                          <div className="space-y-2">
-                            <Label>Аудио файл (WAV/MP3)</Label>
-                            <div className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-accent/50 transition-colors cursor-pointer">
-                              <Icon name="Upload" className="mx-auto mb-2 text-muted-foreground" size={32} />
-                              <p className="text-sm text-muted-foreground">Нажмите для загрузки или перетащите файл</p>
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Обложка (3000×3000px)</Label>
-                            <div className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-accent/50 transition-colors cursor-pointer">
-                              <Icon name="Image" className="mx-auto mb-2 text-muted-foreground" size={32} />
-                              <p className="text-sm text-muted-foreground">Нажмите для загрузки или перетащите файл</p>
-                            </div>
-                          </div>
                           <Button className="w-full hover:scale-105 transition-transform" onClick={handleUploadRelease}>
-                            Создать релиз
+                            Продолжить
                           </Button>
                         </div>
                       </DialogContent>
                     </Dialog>
                   </div>
                 </div>
+
+                <Dialog open={isAudioUploadOpen} onOpenChange={setIsAudioUploadOpen}>
+                  <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>Загрузка файлов</DialogTitle>
+                      <DialogDescription>Загрузите аудио и обложку для вашего релиза</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="audio-file">Аудио файл (WAV) *</Label>
+                        <Input 
+                          id="audio-file" 
+                          type="file"
+                          accept=".wav"
+                          onChange={handleAudioChange}
+                        />
+                        {audioFile && <p className="text-sm text-green-600">✓ {audioFile.name}</p>}
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="cover-file">Обложка (квадратная) *</Label>
+                        <Input 
+                          id="cover-file" 
+                          type="file"
+                          accept="image/*"
+                          onChange={handleCoverChange}
+                        />
+                        {coverFile && <p className="text-sm text-green-600">✓ {coverFile.name}</p>}
+                      </div>
+                      <Button className="w-full" onClick={handleUploadFiles} disabled={!audioFile || !coverFile}>
+                        Отправить на модерацию
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                  <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Редактировать релиз</DialogTitle>
+                    </DialogHeader>
+                    {editingRelease && (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Название релиза</Label>
+                          <Input 
+                            value={editingRelease.title}
+                            onChange={(e) => setEditingRelease({ ...editingRelease, title: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Жанр</Label>
+                          <Select value={editingRelease.genre} onValueChange={(value) => setEditingRelease({ ...editingRelease, genre: value })}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pop">Pop</SelectItem>
+                              <SelectItem value="rock">Rock</SelectItem>
+                              <SelectItem value="electronic">Electronic</SelectItem>
+                              <SelectItem value="hip-hop">Hip-Hop</SelectItem>
+                              <SelectItem value="jazz">Jazz</SelectItem>
+                              <SelectItem value="classical">Classical</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Автор музыки</Label>
+                          <Input 
+                            value={editingRelease.musicAuthor || ''}
+                            onChange={(e) => setEditingRelease({ ...editingRelease, musicAuthor: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Автор текста</Label>
+                          <Input 
+                            value={editingRelease.lyricsAuthor || ''}
+                            onChange={(e) => setEditingRelease({ ...editingRelease, lyricsAuthor: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Описание</Label>
+                          <Textarea 
+                            value={editingRelease.description || ''}
+                            onChange={(e) => setEditingRelease({ ...editingRelease, description: e.target.value })}
+                          />
+                        </div>
+                        <Button className="w-full" onClick={handleUpdateRelease}>
+                          Сохранить изменения
+                        </Button>
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
 
                 <div className="space-y-4">
                   {releases.length === 0 ? (
@@ -534,7 +861,7 @@ const Index = () => {
                               </div>
                               <div>
                                 <h3 className="font-semibold text-lg">{release.title}</h3>
-                                <p className="text-sm text-muted-foreground mb-1">{release.artist}</p>
+                                <p className="text-sm text-muted-foreground mb-1">{user.artistName}</p>
                                 <div className="flex items-center gap-3">
                                   <Badge variant={release.status === 'Опубликован' ? 'default' : 'secondary'}>
                                     {release.status}
@@ -545,20 +872,41 @@ const Index = () => {
                                 </div>
                               </div>
                             </div>
-                            <div className="text-right">
-                              {release.status === 'Опубликован' ? (
-                                <>
+                            <div className="flex items-center gap-3">
+                              {release.status === 'Опубликован' && (
+                                <div className="text-right mr-4">
                                   <div className="text-2xl font-bold">{release.revenue}₽</div>
                                   <p className="text-xs text-muted-foreground">доход</p>
-                                </>
-                              ) : release.status === 'На проверке' ? (
-                                <div className="w-48">
+                                </div>
+                              )}
+                              {release.status === 'На модерации' && (
+                                <div className="w-48 mr-4">
                                   <p className="text-sm mb-2 text-muted-foreground">Модерация</p>
                                   <Progress value={65} />
                                 </div>
-                              ) : (
-                                <Button variant="outline" className="hover:scale-105 transition-transform">Продолжить</Button>
                               )}
+                              {release.status === 'Черновик' && (
+                                <Button variant="outline" size="sm" onClick={() => setIsAudioUploadOpen(true)}>
+                                  Продолжить
+                                </Button>
+                              )}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon">
+                                    <Icon name="MoreVertical" size={18} />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleEditRelease(release)}>
+                                    <Icon name="Edit" size={16} className="mr-2" />
+                                    Редактировать
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleDeleteRelease(release.id)} className="text-destructive">
+                                    <Icon name="Trash2" size={16} className="mr-2" />
+                                    Удалить
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </div>
                         </CardContent>
@@ -795,7 +1143,7 @@ const Index = () => {
           <div className="grid md:grid-cols-3 gap-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <img src="https://cdn.poehali.dev/projects/33951d59-5d7e-47f4-880f-c2ae98b9913e/files/48b2980d-2176-4462-8c7b-cb26e59aaf60.jpg" alt="OLPROD Logo" className="w-8 h-8 rounded-lg" />
+                <img src="https://cdn.poehali.dev/projects/33951d59-5d7e-47f4-880f-c2ae98b9913e/files/dc7a385c-d082-4a5b-89e7-4ee95e93f99c.jpg" alt="OLPROD Logo" className="w-8 h-8 rounded-lg" />
                 <span className="font-bold text-lg">OLPROD</span>
               </div>
               <p className="text-sm text-muted-foreground">Профессиональная дистрибуция музыки на все платформы</p>
@@ -823,7 +1171,7 @@ const Index = () => {
       <AISupportChat />
 
       <a 
-        href="https://cdn.poehali.dev/projects/33951d59-5d7e-47f4-880f-c2ae98b9913e/files/48b2980d-2176-4462-8c7b-cb26e59aaf60.jpg" 
+        href="https://cdn.poehali.dev/projects/33951d59-5d7e-47f4-880f-c2ae98b9913e/files/dc7a385c-d082-4a5b-89e7-4ee95e93f99c.jpg" 
         download="olprod-logo.jpg"
         className="fixed bottom-24 left-4 bg-primary text-primary-foreground p-3 rounded-full shadow-lg hover:scale-110 transition-transform z-40"
         title="Скачать логотип"
