@@ -55,6 +55,7 @@ interface SmartLink {
   artistName: string;
   platforms: { name: string; url: string }[];
   coverUrl?: string;
+  isDeleted?: boolean;
 }
 
 const DRAFT_STORAGE_KEY = 'olprod_release_draft';
@@ -62,6 +63,7 @@ const DRAFT_STORAGE_KEY = 'olprod_release_draft';
 const Index = () => {
   const [activeSection, setActiveSection] = useState('home');
   const [dashboardTab, setDashboardTab] = useState('releases');
+  const [smartLinksTab, setSmartLinksTab] = useState('active');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
@@ -160,6 +162,8 @@ const Index = () => {
 
   const activeReleases = releases.filter(r => !r.isDeleted);
   const deletedReleases = releases.filter(r => r.isDeleted);
+  const activeSmartLinks = smartLinks.filter(s => !s.isDeleted);
+  const deletedSmartLinks = smartLinks.filter(s => s.isDeleted);
   const totalRevenue = activeReleases.reduce((sum, r) => sum + r.revenue, 0);
   const totalStreams = activeReleases.reduce((sum, r) => sum + r.streams, 0);
 
@@ -467,7 +471,8 @@ const Index = () => {
       releaseName: newSmartLink.releaseName,
       artistName: user?.artistName || '',
       platforms: validLinks,
-      coverUrl: smartLinkCoverPreview || undefined
+      coverUrl: smartLinkCoverPreview || undefined,
+      isDeleted: false
     };
 
     setSmartLinks([smartLink, ...smartLinks]);
@@ -484,6 +489,22 @@ const Index = () => {
     setSmartLinkCoverPreview(null);
     setIsSmartLinkOpen(false);
     toast({ title: 'Смартлинк создан!', description: 'Поделитесь ссылкой со слушателями' });
+  };
+
+  const handleDeleteSmartLink = (smartLinkId: string) => {
+    setSmartLinks(smartLinks.map(s => s.id === smartLinkId ? { ...s, isDeleted: true } : s));
+    toast({ title: 'Перемещено', description: 'Смартлинк перемещён в корзину' });
+  };
+
+  const handleRestoreSmartLink = (smartLinkId: string) => {
+    setSmartLinks(smartLinks.map(s => s.id === smartLinkId ? { ...s, isDeleted: false } : s));
+    toast({ title: 'Восстановлено', description: 'Смартлинк восстановлен' });
+  };
+
+  const handleDeleteSmartLinkPermanently = (smartLinkId: string) => {
+    if (!confirm('Удалить смартлинк навсегда? Это действие нельзя отменить.')) return;
+    setSmartLinks(smartLinks.filter(s => s.id !== smartLinkId));
+    toast({ title: 'Удалено', description: 'Смартлинк удалён навсегда' });
   };
 
   const handleWithdraw = () => {
@@ -570,9 +591,11 @@ const Index = () => {
             <button onClick={() => setActiveSection('platforms')} className="text-sm font-medium hover:text-primary transition-colors">
               Платформы
             </button>
-            <button onClick={() => requireAuth(() => setActiveSection('smartlinks'))} className="text-sm font-medium hover:text-primary transition-colors">
-              Смартлинки
-            </button>
+            {user && (
+              <button onClick={() => { setActiveSection('dashboard'); setDashboardTab('smartlinks'); }} className="text-sm font-medium hover:text-primary transition-colors">
+                Смартлинки
+              </button>
+            )}
           </nav>
 
           <div className="flex items-center gap-3">
@@ -580,7 +603,7 @@ const Index = () => {
               <>
                 <Dialog open={isAuthOpen} onOpenChange={setIsAuthOpen}>
                   <DialogTrigger asChild>
-                    <Button size="sm" className={theme === 'crystal' ? 'glass-button' : ''}>Вход</Button>
+                    <Button size="sm" className={theme === 'crystal' ? 'glass-button' : ''}>Войти</Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md">
                     <DialogHeader>
@@ -909,10 +932,11 @@ const Index = () => {
               <TabsList>
                 <TabsTrigger value="releases">Релизы</TabsTrigger>
                 <TabsTrigger value="analytics">Аналитика</TabsTrigger>
+                <TabsTrigger value="smartlinks">Смартлинки</TabsTrigger>
                 <TabsTrigger value="trash">
                   Корзина
-                  {deletedReleases.length > 0 && (
-                    <Badge variant="destructive" className="ml-2">{deletedReleases.length}</Badge>
+                  {(deletedReleases.length + deletedSmartLinks.length) > 0 && (
+                    <Badge variant="destructive" className="ml-2">{deletedReleases.length + deletedSmartLinks.length}</Badge>
                   )}
                 </TabsTrigger>
               </TabsList>
@@ -1051,6 +1075,195 @@ const Index = () => {
                 )}
               </TabsContent>
 
+              <TabsContent value="smartlinks" className="space-y-6">
+                <div className="mb-8 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold mb-2">Смартлинки</h2>
+                    <p className="text-muted-foreground">Одна ссылка для всех платформ</p>
+                  </div>
+                  <Dialog open={isSmartLinkOpen} onOpenChange={setIsSmartLinkOpen}>
+                    <DialogTrigger asChild>
+                      <Button className={theme === 'crystal' ? 'glass-button' : ''}>
+                        <Icon name="Link" size={18} className="mr-2" />
+                        Создать смартлинк
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Создать смартлинк</DialogTitle>
+                        <DialogDescription>Добавьте ссылки на ваш релиз</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="smartlink-name">Название релиза</Label>
+                          <Input 
+                            id="smartlink-name"
+                            placeholder="My Track"
+                            value={newSmartLink.releaseName}
+                            onChange={(e) => setNewSmartLink({...newSmartLink, releaseName: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="smartlink-cover">Обложка 3000×3000</Label>
+                          <Input 
+                            id="smartlink-cover"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleSmartLinkCoverChange}
+                          />
+                          {smartLinkCoverPreview && (
+                            <img src={smartLinkCoverPreview} alt="Smart link cover" className="w-32 h-32 rounded-lg object-cover border-2 border-border mt-2" />
+                          )}
+                        </div>
+                        {newSmartLink.platformLinks.map((platform, index) => (
+                          <div key={platform.name} className="space-y-2">
+                            <Label htmlFor={`link-${index}`}>{platform.name}</Label>
+                            <Input 
+                              id={`link-${index}`}
+                              placeholder="https://..."
+                              value={platform.url}
+                              onChange={(e) => {
+                                const updated = [...newSmartLink.platformLinks];
+                                updated[index].url = e.target.value;
+                                setNewSmartLink({...newSmartLink, platformLinks: updated});
+                              }}
+                            />
+                          </div>
+                        ))}
+                        <Button className="w-full" onClick={handleCreateSmartLink}>
+                          Создать
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+
+                <Tabs value={smartLinksTab} onValueChange={setSmartLinksTab}>
+                  <TabsList>
+                    <TabsTrigger value="active">Активные</TabsTrigger>
+                    <TabsTrigger value="deleted">
+                      Удалённые
+                      {deletedSmartLinks.length > 0 && (
+                        <Badge variant="destructive" className="ml-2">{deletedSmartLinks.length}</Badge>
+                      )}
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="active" className="mt-6">
+                    {activeSmartLinks.length === 0 ? (
+                      <Card>
+                        <CardContent className="p-12 text-center">
+                          <Icon name="Link" className="mx-auto mb-4 text-muted-foreground" size={48} />
+                          <h3 className="text-xl font-semibold mb-2">Нет смартлинков</h3>
+                          <p className="text-muted-foreground">Создайте свой первый смартлинк</p>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <div className="space-y-4">
+                        {activeSmartLinks.map((link) => (
+                          <Card key={link.id} className={theme === 'crystal' ? 'glass-card' : ''}>
+                            <CardContent className="p-6">
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-4">
+                                  {link.coverUrl ? (
+                                    <img src={link.coverUrl} alt={link.releaseName} className="w-16 h-16 rounded-lg object-cover" />
+                                  ) : (
+                                    <div className="w-16 h-16 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg flex items-center justify-center">
+                                      <Icon name="Music" className="text-primary" size={28} />
+                                    </div>
+                                  )}
+                                  <div>
+                                    <h3 className="font-semibold text-lg">{link.releaseName}</h3>
+                                    <p className="text-sm text-muted-foreground">{link.artistName}</p>
+                                  </div>
+                                </div>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => handleDeleteSmartLink(link.id)}
+                                >
+                                  <Icon name="Trash2" size={18} />
+                                </Button>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                {link.platforms.map((platform) => (
+                                  <a 
+                                    key={platform.name}
+                                    href={platform.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2 p-3 rounded-lg border hover:bg-accent transition-colors"
+                                  >
+                                    <Icon name="ExternalLink" size={16} />
+                                    <span className="text-sm font-medium">{platform.name}</span>
+                                  </a>
+                                ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="deleted" className="mt-6">
+                    {deletedSmartLinks.length === 0 ? (
+                      <Card>
+                        <CardContent className="p-12 text-center">
+                          <Icon name="Trash2" className="mx-auto mb-4 text-muted-foreground" size={48} />
+                          <h3 className="text-xl font-semibold mb-2">Нет удалённых смартлинков</h3>
+                          <p className="text-muted-foreground">Удалённые смартлинки будут здесь</p>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <div className="space-y-4">
+                        {deletedSmartLinks.map((link) => (
+                          <Card key={link.id} className="opacity-60 hover:opacity-100 transition-opacity">
+                            <CardContent className="p-6">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                  {link.coverUrl ? (
+                                    <img src={link.coverUrl} alt={link.releaseName} className="w-16 h-16 rounded-lg object-cover grayscale" />
+                                  ) : (
+                                    <div className="w-16 h-16 bg-gradient-to-br from-muted to-muted/50 rounded-lg flex items-center justify-center">
+                                      <Icon name="Music" className="text-muted-foreground" size={28} />
+                                    </div>
+                                  )}
+                                  <div>
+                                    <h3 className="font-semibold text-lg">{link.releaseName}</h3>
+                                    <p className="text-sm text-muted-foreground mb-1">{link.artistName}</p>
+                                    <Badge variant="outline" className="text-destructive">Удалён</Badge>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => handleRestoreSmartLink(link.id)}
+                                  >
+                                    <Icon name="RotateCcw" size={16} className="mr-2" />
+                                    Восстановить
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="text-destructive"
+                                    onClick={() => handleDeleteSmartLinkPermanently(link.id)}
+                                  >
+                                    <Icon name="Trash2" size={16} className="mr-2" />
+                                    Удалить навсегда
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              </TabsContent>
+
               <TabsContent value="analytics" className="space-y-6">
                 <Card className={theme === 'crystal' ? 'glass-card' : ''}>
                   <CardHeader>
@@ -1096,12 +1309,12 @@ const Index = () => {
               </TabsContent>
 
               <TabsContent value="trash" className="space-y-6">
-                {deletedReleases.length === 0 ? (
+                {(deletedReleases.length === 0 && deletedSmartLinks.length === 0) ? (
                   <Card>
                     <CardContent className="p-12 text-center">
                       <Icon name="Trash2" className="mx-auto mb-4 text-muted-foreground" size={48} />
                       <h3 className="text-xl font-semibold mb-2">Корзина пуста</h3>
-                      <p className="text-muted-foreground">Удалённые релизы будут храниться здесь</p>
+                      <p className="text-muted-foreground">Удалённые релизы и смартлинки будут храниться здесь</p>
                     </CardContent>
                   </Card>
                 ) : (
@@ -1154,6 +1367,51 @@ const Index = () => {
                         </CardContent>
                       </Card>
                     ))}
+                    {deletedSmartLinks.map((link) => (
+                      <Card key={link.id} className="opacity-60 hover:opacity-100 transition-opacity">
+                        <CardContent className="p-6">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              {link.coverUrl ? (
+                                <img src={link.coverUrl} alt={link.releaseName} className="w-16 h-16 rounded-lg object-cover grayscale" />
+                              ) : (
+                                <div className="w-16 h-16 bg-gradient-to-br from-muted to-muted/50 rounded-lg flex items-center justify-center">
+                                  <Icon name="Link" className="text-muted-foreground" size={28} />
+                                </div>
+                              )}
+                              <div>
+                                <h3 className="font-semibold text-lg">{link.releaseName}</h3>
+                                <p className="text-sm text-muted-foreground mb-1">{link.artistName}</p>
+                                <div className="flex items-center gap-3">
+                                  <Badge variant="outline" className="text-destructive">
+                                    Удалён (Смартлинк)
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleRestoreSmartLink(link.id)}
+                              >
+                                <Icon name="RotateCcw" size={16} className="mr-2" />
+                                Восстановить
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="text-destructive"
+                                onClick={() => handleDeleteSmartLinkPermanently(link.id)}
+                              >
+                                <Icon name="Trash2" size={16} className="mr-2" />
+                                Удалить навсегда
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
                 )}
               </TabsContent>
@@ -1177,9 +1435,19 @@ const Index = () => {
                       Spotify, Apple Music, VK, Яндекс Музыка и ещё 150+ площадок. Загружайте релизы, получайте статистику и выводите деньги
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                      <Button size="lg" className={`text-lg px-8 ${theme === 'crystal' ? 'glass-button' : ''}`} onClick={() => setIsAuthOpen(true)}>
-                        Попробовать
-                        <Icon name="Sparkles" size={20} className="ml-2" />
+                      <Button 
+                        size="lg" 
+                        className={`text-lg px-8 ${theme === 'crystal' ? 'glass-button' : ''}`} 
+                        onClick={() => {
+                          if (user) {
+                            setActiveSection('dashboard');
+                          } else {
+                            setIsAuthOpen(true);
+                          }
+                        }}
+                      >
+                        {user ? 'Личный кабинет' : 'Попробовать бесплатно'}
+                        <Icon name={user ? 'LayoutDashboard' : 'Sparkles'} size={20} className="ml-2" />
                       </Button>
                     </div>
                   </div>
@@ -1253,121 +1521,7 @@ const Index = () => {
             </section>
           )}
 
-          {activeSection === 'smartlinks' && user && (
-            <section className="py-16">
-              <div className="container mx-auto px-4">
-                <div className="max-w-4xl mx-auto">
-                  <div className="flex items-center justify-between mb-8">
-                    <div>
-                      <h2 className="text-3xl font-bold mb-2">Смартлинки</h2>
-                      <p className="text-muted-foreground">Одна ссылка для всех платформ</p>
-                    </div>
-                    <Dialog open={isSmartLinkOpen} onOpenChange={setIsSmartLinkOpen}>
-                      <DialogTrigger asChild>
-                        <Button className={theme === 'crystal' ? 'glass-button' : ''}>
-                          <Icon name="Link" size={18} className="mr-2" />
-                          Создать смартлинк
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>Создать смартлинк</DialogTitle>
-                          <DialogDescription>Добавьте ссылки на ваш релиз</DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="smartlink-name">Название релиза</Label>
-                            <Input 
-                              id="smartlink-name"
-                              placeholder="My Track"
-                              value={newSmartLink.releaseName}
-                              onChange={(e) => setNewSmartLink({...newSmartLink, releaseName: e.target.value})}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="smartlink-cover">Обложка 3000×3000</Label>
-                            <Input 
-                              id="smartlink-cover"
-                              type="file"
-                              accept="image/*"
-                              onChange={handleSmartLinkCoverChange}
-                            />
-                            {smartLinkCoverPreview && (
-                              <img src={smartLinkCoverPreview} alt="Smart link cover" className="w-32 h-32 rounded-lg object-cover border-2 border-border mt-2" />
-                            )}
-                          </div>
-                          {newSmartLink.platformLinks.map((platform, index) => (
-                            <div key={platform.name} className="space-y-2">
-                              <Label htmlFor={`link-${index}`}>{platform.name}</Label>
-                              <Input 
-                                id={`link-${index}`}
-                                placeholder="https://..."
-                                value={platform.url}
-                                onChange={(e) => {
-                                  const updated = [...newSmartLink.platformLinks];
-                                  updated[index].url = e.target.value;
-                                  setNewSmartLink({...newSmartLink, platformLinks: updated});
-                                }}
-                              />
-                            </div>
-                          ))}
-                          <Button className="w-full" onClick={handleCreateSmartLink}>
-                            Создать
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
 
-                  {smartLinks.length === 0 ? (
-                    <Card>
-                      <CardContent className="p-12 text-center">
-                        <Icon name="Link" className="mx-auto mb-4 text-muted-foreground" size={48} />
-                        <h3 className="text-xl font-semibold mb-2">Нет смартлинков</h3>
-                        <p className="text-muted-foreground">Создайте свой первый смартлинк</p>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <div className="space-y-4">
-                      {smartLinks.map((link) => (
-                        <Card key={link.id} className={theme === 'crystal' ? 'glass-card' : ''}>
-                          <CardContent className="p-6">
-                            <div className="flex items-center gap-4 mb-4">
-                              {link.coverUrl ? (
-                                <img src={link.coverUrl} alt={link.releaseName} className="w-16 h-16 rounded-lg object-cover" />
-                              ) : (
-                                <div className="w-16 h-16 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg flex items-center justify-center">
-                                  <Icon name="Music" className="text-primary" size={28} />
-                                </div>
-                              )}
-                              <div>
-                                <h3 className="font-semibold text-lg">{link.releaseName}</h3>
-                                <p className="text-sm text-muted-foreground">{link.artistName}</p>
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              {link.platforms.map((platform) => (
-                                <a 
-                                  key={platform.name}
-                                  href={platform.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-2 p-3 rounded-lg border hover:bg-accent transition-colors"
-                                >
-                                  <Icon name="ExternalLink" size={16} />
-                                  <span className="text-sm font-medium">{platform.name}</span>
-                                </a>
-                              ))}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </section>
-          )}
         </>
       )}
 

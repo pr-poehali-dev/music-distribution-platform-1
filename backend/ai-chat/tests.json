@@ -1,0 +1,27 @@
+{
+  "tests": [
+    {
+      "name": "Send chat message",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "message": "Как загрузить релиз?"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "response": "string"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Empty message validation",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "message": ""
+      },
+      "expectedStatus": 400,
+      "bodyMatcher": "partial"
+    }
+  ]
+}
