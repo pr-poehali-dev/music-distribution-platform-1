@@ -120,6 +120,36 @@
     --input: 180 30% 85%;
     --ring: 180 65% 45%;
   }
+
+  .blue {
+    --background: 215 100% 6%;
+    --foreground: 210 20% 98%;
+
+    --card: 215 50% 10%;
+    --card-foreground: 210 20% 98%;
+
+    --popover: 215 50% 10%;
+    --popover-foreground: 210 20% 98%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 215 30% 18%;
+    --secondary-foreground: 210 20% 98%;
+
+    --muted: 215 30% 18%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 215 30% 18%;
+    --accent-foreground: 210 20% 98%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 30% 20%;
+    --input: 215 30% 20%;
+    --ring: 217 91% 60%;
+  }
 }
 
 @layer base {
@@ -201,7 +231,7 @@
   }
 }
 
-.glass-card {
+.crystal .glass-card {
   background: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.1),
@@ -212,7 +242,7 @@
   animation: liquid-glass 4s ease-in-out infinite;
 }
 
-.glass-button {
+.crystal .glass-button {
   position: relative;
   overflow: hidden;
   backdrop-filter: blur(10px);
@@ -225,7 +255,7 @@
   animation: pulse-glow 3s ease-in-out infinite;
 }
 
-.glass-button::before {
+.crystal .glass-button::before {
   content: "";
   position: absolute;
   top: 0;
@@ -241,7 +271,7 @@
   transition: left 0.5s;
 }
 
-.glass-button:hover::before {
+.crystal .glass-button:hover::before {
   left: 100%;
 }
 
