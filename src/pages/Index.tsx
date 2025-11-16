@@ -6,7 +6,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -30,19 +29,26 @@ interface Release {
   genre?: string;
   releaseDate?: string;
   coverUrl?: string;
+  description?: string;
+}
+
+interface SmartLink {
+  id: string;
+  releaseName: string;
+  artistName: string;
+  platforms: { name: string; url: string }[];
 }
 
 const Index = () => {
   const [activeSection, setActiveSection] = useState('home');
+  const [dashboardTab, setDashboardTab] = useState('releases');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark' | 'crystal'>('light');
-  const [releases, setReleases] = useState<Release[]>([
-    { id: '1', title: 'Midnight Dreams', artist: '', status: 'Опубликован', streams: 12450, revenue: 1890 },
-    { id: '2', title: 'Summer Vibes EP', artist: '', status: 'На проверке', streams: 0, revenue: 0 },
-    { id: '3', title: 'Lost in Tokyo', artist: '', status: 'Черновик', streams: 0, revenue: 0 }
-  ]);
+  const [releases, setReleases] = useState<Release[]>([]);
+  const [smartLinks, setSmartLinks] = useState<SmartLink[]>([]);
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -56,6 +62,16 @@ const Index = () => {
     releaseDate: '',
     description: '',
     platforms: [] as string[]
+  });
+
+  const [newSmartLink, setNewSmartLink] = useState({
+    releaseName: '',
+    platformLinks: [
+      { name: 'Spotify', url: '' },
+      { name: 'Apple Music', url: '' },
+      { name: 'VK Музыка', url: '' },
+      { name: 'Яндекс Музыка', url: '' }
+    ]
   });
 
   useEffect(() => {
@@ -72,24 +88,8 @@ const Index = () => {
     { name: 'Deezer', icon: 'Music4' }
   ];
 
-  const faqs = [
-    {
-      q: 'Сколько времени занимает публикация?',
-      a: 'Обычно 3-5 рабочих дней после модерации. На некоторых платформах может занять до 2 недель.'
-    },
-    {
-      q: 'Какие форматы файлов принимаются?',
-      a: 'Аудио: WAV (24-bit, 44.1kHz или выше) или MP3 (320kbps). Обложка: JPG/PNG 3000×3000px.'
-    },
-    {
-      q: 'Как происходит выплата роялти?',
-      a: 'Выплаты ежемесячно от 100₽. Поддерживаем карты РФ, PayPal, банковские переводы.'
-    },
-    {
-      q: 'Могу ли я удалить релиз после публикации?',
-      a: 'Да, в любой момент через личный кабинет. Снятие занимает 1-3 дня.'
-    }
-  ];
+  const totalRevenue = releases.reduce((sum, r) => sum + r.revenue, 0);
+  const totalStreams = releases.reduce((sum, r) => sum + r.streams, 0);
 
   const handleLogin = () => {
     if (!loginEmail || !loginPassword) {
@@ -131,13 +131,63 @@ const Index = () => {
       streams: 0,
       revenue: 0,
       genre: newRelease.genre,
-      releaseDate: newRelease.releaseDate
+      releaseDate: newRelease.releaseDate,
+      description: newRelease.description
     };
 
     setReleases([release, ...releases]);
     setIsUploadOpen(false);
     setNewRelease({ title: '', genre: '', releaseDate: '', description: '', platforms: [] });
     toast({ title: 'Релиз создан!', description: 'Загрузите аудио и обложку для отправки на модерацию' });
+  };
+
+  const handleCreateSmartLink = () => {
+    if (!newSmartLink.releaseName) {
+      toast({ title: 'Ошибка', description: 'Укажите название релиза', variant: 'destructive' });
+      return;
+    }
+
+    const validLinks = newSmartLink.platformLinks.filter(p => p.url.trim() !== '');
+    
+    if (validLinks.length === 0) {
+      toast({ title: 'Ошибка', description: 'Добавьте хотя бы одну ссылку', variant: 'destructive' });
+      return;
+    }
+
+    const smartLink: SmartLink = {
+      id: Date.now().toString(),
+      releaseName: newSmartLink.releaseName,
+      artistName: user?.artistName || '',
+      platforms: validLinks
+    };
+
+    setSmartLinks([smartLink, ...smartLinks]);
+    setNewSmartLink({
+      releaseName: '',
+      platformLinks: [
+        { name: 'Spotify', url: '' },
+        { name: 'Apple Music', url: '' },
+        { name: 'VK Музыка', url: '' },
+        { name: 'Яндекс Музыка', url: '' }
+      ]
+    });
+    toast({ title: 'Смартлинк создан!', description: 'Поделитесь ссылкой со слушателями' });
+  };
+
+  const handleWithdraw = () => {
+    if (totalRevenue < 100) {
+      toast({ 
+        title: 'Недостаточно средств', 
+        description: `На счёте ${totalRevenue}₽. Минимальная сумма для вывода — 100₽`,
+        variant: 'destructive' 
+      });
+      return;
+    }
+
+    const mailtoLink = `mailto:olprodlabel@gmail.com?subject=Запрос на вывод средств&body=Артист: ${user?.artistName}%0AEmail: ${user?.email}%0AСумма: ${totalRevenue}₽`;
+    window.location.href = mailtoLink;
+    setIsWithdrawOpen(false);
+    toast({ title: 'Запрос отправлен', description: 'Мы свяжемся с вами в течение 1-2 дней' });
   };
 
   const requireAuth = (action: () => void) => {
@@ -153,8 +203,8 @@ const Index = () => {
     <div className="min-h-screen bg-background transition-colors duration-300">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Icon name="Disc3" className="text-primary" size={28} />
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveSection('home')}>
+            <img src="https://cdn.poehali.dev/projects/33951d59-5d7e-47f4-880f-c2ae98b9913e/files/48b2980d-2176-4462-8c7b-cb26e59aaf60.jpg" alt="OLPROD Logo" className="w-10 h-10 rounded-lg" />
             <span className="font-bold text-xl">OLPROD</span>
           </div>
 
@@ -167,9 +217,6 @@ const Index = () => {
             </button>
             <button onClick={() => requireAuth(() => setActiveSection('smartlinks'))} className="text-sm font-medium hover:text-primary transition-colors">
               Смартлинки
-            </button>
-            <button onClick={() => setActiveSection('faq')} className="text-sm font-medium hover:text-primary transition-colors">
-              FAQ
             </button>
           </nav>
 
@@ -272,7 +319,9 @@ const Index = () => {
                     </Tabs>
                   </DialogContent>
                 </Dialog>
-                <Button size="sm" onClick={() => setIsAuthOpen(true)}>Начать бесплатно</Button>
+                <Button size="sm" onClick={() => setIsAuthOpen(true)} className="hover:scale-105 transition-transform">
+                  Начать бесплатно
+                </Button>
               </>
             ) : (
               <>
@@ -309,169 +358,261 @@ const Index = () => {
               <p className="text-muted-foreground">Добро пожаловать, {user.artistName}</p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-6 mb-8">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Всего прослушиваний</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">12,450</div>
-                  <p className="text-xs text-green-600 mt-1">+18% за месяц</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Доход</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">1,890₽</div>
-                  <p className="text-xs text-muted-foreground mt-1">Мин. вывод: 100₽</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Активных релизов</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">{releases.filter(r => r.status === 'Опубликован').length}</div>
-                  <p className="text-xs text-muted-foreground mt-1">{releases.filter(r => r.status === 'На проверке').length} на модерации</p>
-                </CardContent>
-              </Card>
-            </div>
+            <Tabs value={dashboardTab} onValueChange={setDashboardTab} className="space-y-6">
+              <TabsList>
+                <TabsTrigger value="releases">Релизы</TabsTrigger>
+                <TabsTrigger value="analytics">Аналитика</TabsTrigger>
+              </TabsList>
 
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">Мои релизы</h2>
-              <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Icon name="Upload" size={18} className="mr-2" />
-                    Загрузить релиз
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-lg">
-                  <DialogHeader>
-                    <DialogTitle>Новый релиз</DialogTitle>
-                    <DialogDescription>Заполните информацию о вашем релизе</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="release-title">Название релиза *</Label>
-                      <Input 
-                        id="release-title" 
-                        placeholder="Midnight Dreams"
-                        value={newRelease.title}
-                        onChange={(e) => setNewRelease({ ...newRelease, title: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="artist-display">Артист</Label>
-                      <Input 
-                        id="artist-display" 
-                        value={user.artistName}
-                        disabled
-                        className="bg-muted"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="genre">Жанр *</Label>
-                      <Select value={newRelease.genre} onValueChange={(value) => setNewRelease({ ...newRelease, genre: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Выберите жанр" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pop">Pop</SelectItem>
-                          <SelectItem value="rock">Rock</SelectItem>
-                          <SelectItem value="electronic">Electronic</SelectItem>
-                          <SelectItem value="hip-hop">Hip-Hop</SelectItem>
-                          <SelectItem value="jazz">Jazz</SelectItem>
-                          <SelectItem value="classical">Classical</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="release-date">Дата релиза</Label>
-                      <Input 
-                        id="release-date" 
-                        type="date"
-                        value={newRelease.releaseDate}
-                        onChange={(e) => setNewRelease({ ...newRelease, releaseDate: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="description">Описание</Label>
-                      <Textarea 
-                        id="description" 
-                        placeholder="Расскажите о релизе..."
-                        value={newRelease.description}
-                        onChange={(e) => setNewRelease({ ...newRelease, description: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Аудио файл (WAV/MP3)</Label>
-                      <div className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-accent/50 transition-colors cursor-pointer">
-                        <Icon name="Upload" className="mx-auto mb-2 text-muted-foreground" size={32} />
-                        <p className="text-sm text-muted-foreground">Нажмите для загрузки или перетащите файл</p>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Обложка (3000×3000px)</Label>
-                      <div className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-accent/50 transition-colors cursor-pointer">
-                        <Icon name="Image" className="mx-auto mb-2 text-muted-foreground" size={32} />
-                        <p className="text-sm text-muted-foreground">Нажмите для загрузки или перетащите файл</p>
-                      </div>
-                    </div>
-                    <Button className="w-full" onClick={handleUploadRelease}>
-                      Создать релиз
-                    </Button>
+              <TabsContent value="releases" className="space-y-6">
+                <div className="grid md:grid-cols-3 gap-6">
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Всего прослушиваний</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold">{totalStreams.toLocaleString()}</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Доход</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold">{totalRevenue}₽</div>
+                      <p className="text-xs text-muted-foreground mt-1">Мин. вывод: 100₽</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Активных релизов</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold">{releases.filter(r => r.status === 'Опубликован').length}</div>
+                      <p className="text-xs text-muted-foreground mt-1">{releases.filter(r => r.status === 'На проверке').length} на модерации</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold">Мои релизы</h2>
+                  <div className="flex gap-3">
+                    <Dialog open={isWithdrawOpen} onOpenChange={setIsWithdrawOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" className="hover:scale-105 transition-transform">
+                          <Icon name="Wallet" size={18} className="mr-2" />
+                          Вывести
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Вывод средств</DialogTitle>
+                          <DialogDescription>Текущий баланс: {totalRevenue}₽</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <p className="text-sm text-muted-foreground">
+                            Минимальная сумма для вывода — 100₽. 
+                            {totalRevenue >= 100 
+                              ? ' Нажмите кнопку ниже, чтобы отправить запрос на вывод средств.' 
+                              : ` Вам нужно еще ${100 - totalRevenue}₽.`}
+                          </p>
+                          <Button className="w-full" onClick={handleWithdraw} disabled={totalRevenue < 100}>
+                            {totalRevenue >= 100 ? 'Отправить запрос' : 'Недостаточно средств'}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                    <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="hover:scale-105 transition-transform">
+                          <Icon name="Upload" size={18} className="mr-2" />
+                          Загрузить релиз
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-lg">
+                        <DialogHeader>
+                          <DialogTitle>Новый релиз</DialogTitle>
+                          <DialogDescription>Заполните информацию о вашем релизе</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="release-title">Название релиза *</Label>
+                            <Input 
+                              id="release-title" 
+                              placeholder="Midnight Dreams"
+                              value={newRelease.title}
+                              onChange={(e) => setNewRelease({ ...newRelease, title: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="artist-display">Артист</Label>
+                            <Input 
+                              id="artist-display" 
+                              value={user.artistName}
+                              disabled
+                              className="bg-muted"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="genre">Жанр *</Label>
+                            <Select value={newRelease.genre} onValueChange={(value) => setNewRelease({ ...newRelease, genre: value })}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Выберите жанр" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pop">Pop</SelectItem>
+                                <SelectItem value="rock">Rock</SelectItem>
+                                <SelectItem value="electronic">Electronic</SelectItem>
+                                <SelectItem value="hip-hop">Hip-Hop</SelectItem>
+                                <SelectItem value="jazz">Jazz</SelectItem>
+                                <SelectItem value="classical">Classical</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="release-date">Дата релиза</Label>
+                            <Input 
+                              id="release-date" 
+                              type="date"
+                              value={newRelease.releaseDate}
+                              onChange={(e) => setNewRelease({ ...newRelease, releaseDate: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="description">Описание</Label>
+                            <Textarea 
+                              id="description" 
+                              placeholder="Расскажите о релизе..."
+                              value={newRelease.description}
+                              onChange={(e) => setNewRelease({ ...newRelease, description: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Аудио файл (WAV/MP3)</Label>
+                            <div className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-accent/50 transition-colors cursor-pointer">
+                              <Icon name="Upload" className="mx-auto mb-2 text-muted-foreground" size={32} />
+                              <p className="text-sm text-muted-foreground">Нажмите для загрузки или перетащите файл</p>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Обложка (3000×3000px)</Label>
+                            <div className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-accent/50 transition-colors cursor-pointer">
+                              <Icon name="Image" className="mx-auto mb-2 text-muted-foreground" size={32} />
+                              <p className="text-sm text-muted-foreground">Нажмите для загрузки или перетащите файл</p>
+                            </div>
+                          </div>
+                          <Button className="w-full hover:scale-105 transition-transform" onClick={handleUploadRelease}>
+                            Создать релиз
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
-                </DialogContent>
-              </Dialog>
-            </div>
+                </div>
 
-            <div className="space-y-4">
-              {releases.map((release) => (
-                <Card key={release.id}>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 bg-gradient-to-br from-primary/30 to-secondary/30 rounded-lg flex items-center justify-center">
-                          <Icon name="Music" className="text-primary" size={28} />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-lg">{release.title}</h3>
-                          <p className="text-sm text-muted-foreground mb-1">{user.artistName}</p>
-                          <div className="flex items-center gap-3">
-                            <Badge variant={release.status === 'Опубликован' ? 'default' : 'secondary'}>
-                              {release.status}
-                            </Badge>
-                            {release.status === 'Опубликован' && (
-                              <span className="text-sm text-muted-foreground">
-                                {release.streams.toLocaleString()} прослушиваний
-                              </span>
-                            )}
+                <div className="space-y-4">
+                  {releases.length === 0 ? (
+                    <Card>
+                      <CardContent className="p-12 text-center">
+                        <Icon name="Disc3" className="mx-auto mb-4 text-muted-foreground" size={48} />
+                        <h3 className="text-xl font-semibold mb-2">Ничего не нашлось</h3>
+                        <p className="text-muted-foreground mb-6">Загрузите свой первый релиз, чтобы начать</p>
+                        <Button onClick={() => setIsUploadOpen(true)}>
+                          <Icon name="Upload" size={18} className="mr-2" />
+                          Загрузить релиз
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    releases.map((release) => (
+                      <Card key={release.id}>
+                        <CardContent className="p-6">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="w-16 h-16 bg-gradient-to-br from-primary/30 to-secondary/30 rounded-lg flex items-center justify-center">
+                                <Icon name="Music" className="text-primary" size={28} />
+                              </div>
+                              <div>
+                                <h3 className="font-semibold text-lg">{release.title}</h3>
+                                <p className="text-sm text-muted-foreground mb-1">{release.artist}</p>
+                                <div className="flex items-center gap-3">
+                                  <Badge variant={release.status === 'Опубликован' ? 'default' : 'secondary'}>
+                                    {release.status}
+                                  </Badge>
+                                  {release.genre && (
+                                    <span className="text-sm text-muted-foreground">{release.genre}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              {release.status === 'Опубликован' ? (
+                                <>
+                                  <div className="text-2xl font-bold">{release.revenue}₽</div>
+                                  <p className="text-xs text-muted-foreground">доход</p>
+                                </>
+                              ) : release.status === 'На проверке' ? (
+                                <div className="w-48">
+                                  <p className="text-sm mb-2 text-muted-foreground">Модерация</p>
+                                  <Progress value={65} />
+                                </div>
+                              ) : (
+                                <Button variant="outline" className="hover:scale-105 transition-transform">Продолжить</Button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        {release.status === 'Опубликован' ? (
-                          <>
-                            <div className="text-2xl font-bold">{release.revenue}₽</div>
-                            <p className="text-xs text-muted-foreground">доход</p>
-                          </>
-                        ) : release.status === 'На проверке' ? (
-                          <div className="w-48">
-                            <p className="text-sm mb-2 text-muted-foreground">Модерация</p>
-                            <Progress value={65} />
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="analytics" className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Прослушивания по платформам</CardTitle>
+                      <CardDescription>Статистика за последние 30 дней</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {platforms.slice(0, 4).map((platform, idx) => (
+                          <div key={platform.name} className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <Icon name={platform.icon as any} size={20} className="text-muted-foreground" />
+                              <span className="text-sm">{platform.name}</span>
+                            </div>
+                            <span className="text-sm font-semibold">{(totalStreams * (0.4 - idx * 0.1)).toFixed(0)}</span>
                           </div>
-                        ) : (
-                          <Button variant="outline">Продолжить</Button>
-                        )}
+                        ))}
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Доход по релизам</CardTitle>
+                      <CardDescription>Топ релизов за месяц</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {releases.filter(r => r.status === 'Опубликован').length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-8">Нет опубликованных релизов</p>
+                      ) : (
+                        <div className="space-y-4">
+                          {releases.filter(r => r.status === 'Опубликован').map((release) => (
+                            <div key={release.id} className="flex items-center justify-between">
+                              <span className="text-sm">{release.title}</span>
+                              <span className="text-sm font-semibold">{release.revenue}₽</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         </section>
       ) : (
@@ -491,12 +632,9 @@ const Index = () => {
                       Spotify, Apple Music, VK, Яндекс Музыка и ещё 150+ площадок. Загружайте релизы, получайте статистику и выводите деньги
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                      <Button size="lg" className="text-lg px-8" onClick={() => requireAuth(() => setIsUploadOpen(true))}>
-                        Загрузить релиз
-                        <Icon name="Upload" size={20} className="ml-2" />
-                      </Button>
-                      <Button size="lg" variant="outline" className="text-lg px-8" onClick={() => setActiveSection('platforms')}>
-                        Посмотреть платформы
+                      <Button size="lg" className="text-lg px-8 hover:scale-105 transition-transform" onClick={() => requireAuth(() => setIsUploadOpen(true))}>
+                        Попробовать
+                        <Icon name="Sparkles" size={20} className="ml-2" />
                       </Button>
                     </div>
                   </div>
@@ -506,7 +644,7 @@ const Index = () => {
               <section className="py-16 border-t">
                 <div className="container mx-auto px-4">
                   <div className="grid md:grid-cols-3 gap-8">
-                    <Card className="text-center hover:shadow-lg transition-shadow">
+                    <Card className="text-center hover:shadow-lg transition-all hover:-translate-y-1">
                       <CardHeader>
                         <div className="mx-auto w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
                           <Icon name="Zap" className="text-primary" size={24} />
@@ -518,7 +656,7 @@ const Index = () => {
                       </CardContent>
                     </Card>
 
-                    <Card className="text-center hover:shadow-lg transition-shadow">
+                    <Card className="text-center hover:shadow-lg transition-all hover:-translate-y-1">
                       <CardHeader>
                         <div className="mx-auto w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
                           <Icon name="BarChart3" className="text-primary" size={24} />
@@ -530,7 +668,7 @@ const Index = () => {
                       </CardContent>
                     </Card>
 
-                    <Card className="text-center hover:shadow-lg transition-shadow">
+                    <Card className="text-center hover:shadow-lg transition-all hover:-translate-y-1">
                       <CardHeader>
                         <div className="mx-auto w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
                           <Icon name="Wallet" className="text-primary" size={24} />
@@ -575,59 +713,77 @@ const Index = () => {
                   <h2 className="text-3xl md:text-4xl font-bold mb-4">Смартлинки</h2>
                   <p className="text-muted-foreground text-lg">Одна ссылка на все платформы</p>
                 </div>
-                <Card>
+                
+                <Card className="mb-8">
                   <CardContent className="pt-6">
                     <div className="space-y-6">
                       <div>
-                        <Label htmlFor="release-name">Название релиза</Label>
-                        <Input id="release-name" placeholder="Midnight Dreams" className="mt-2" />
+                        <Label htmlFor="release-name">Название релиза *</Label>
+                        <Input 
+                          id="release-name" 
+                          placeholder="Midnight Dreams" 
+                          className="mt-2"
+                          value={newSmartLink.releaseName}
+                          onChange={(e) => setNewSmartLink({ ...newSmartLink, releaseName: e.target.value })}
+                        />
                       </div>
                       <div>
                         <Label htmlFor="artist-name">Артист</Label>
                         <Input id="artist-name" value={user?.artistName || ''} disabled className="mt-2 bg-muted" />
                       </div>
                       <div>
-                        <Label>Платформы</Label>
-                        <div className="grid grid-cols-2 gap-3 mt-2">
-                          {platforms.slice(0, 4).map((platform) => (
-                            <div key={platform.name} className="flex items-center gap-2 p-3 border rounded-lg">
-                              <input type="checkbox" defaultChecked className="rounded" />
-                              <Icon name={platform.icon as any} size={20} />
-                              <span className="text-sm">{platform.name}</span>
+                        <Label>Ссылки на платформы</Label>
+                        <div className="space-y-3 mt-2">
+                          {newSmartLink.platformLinks.map((platform, idx) => (
+                            <div key={platform.name} className="flex items-center gap-3">
+                              <div className="w-32 flex items-center gap-2">
+                                <Icon name={platforms.find(p => p.name === platform.name)?.icon as any} size={18} />
+                                <span className="text-sm">{platform.name}</span>
+                              </div>
+                              <Input 
+                                placeholder="https://..."
+                                value={platform.url}
+                                onChange={(e) => {
+                                  const updated = [...newSmartLink.platformLinks];
+                                  updated[idx].url = e.target.value;
+                                  setNewSmartLink({ ...newSmartLink, platformLinks: updated });
+                                }}
+                              />
                             </div>
                           ))}
                         </div>
                       </div>
-                      <Button className="w-full">
+                      <Button className="w-full hover:scale-105 transition-transform" onClick={handleCreateSmartLink}>
                         <Icon name="Link" size={18} className="mr-2" />
                         Создать смартлинк
                       </Button>
                     </div>
                   </CardContent>
                 </Card>
-              </div>
-            </section>
-          )}
 
-          {activeSection === 'faq' && (
-            <section className="py-16">
-              <div className="container mx-auto px-4 max-w-3xl">
-                <div className="text-center mb-12">
-                  <h2 className="text-3xl md:text-4xl font-bold mb-4">Вопросы и ответы</h2>
-                  <p className="text-muted-foreground text-lg">Ответы на частые вопросы</p>
-                </div>
-                <Accordion type="single" collapsible className="space-y-4">
-                  {faqs.map((faq, idx) => (
-                    <AccordionItem key={idx} value={`item-${idx}`} className="border rounded-lg px-6">
-                      <AccordionTrigger className="text-left font-medium hover:no-underline">
-                        {faq.q}
-                      </AccordionTrigger>
-                      <AccordionContent className="text-muted-foreground">
-                        {faq.a}
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
+                {smartLinks.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-xl font-semibold">Ваши смартлинки</h3>
+                    {smartLinks.map((link) => (
+                      <Card key={link.id}>
+                        <CardContent className="p-6">
+                          <h4 className="font-semibold mb-2">{link.releaseName}</h4>
+                          <p className="text-sm text-muted-foreground mb-4">{link.artistName}</p>
+                          <div className="space-y-2">
+                            {link.platforms.map((platform) => (
+                              <div key={platform.name} className="flex items-center justify-between">
+                                <span className="text-sm">{platform.name}</span>
+                                <a href={platform.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+                                  Открыть
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </div>
             </section>
           )}
@@ -639,7 +795,7 @@ const Index = () => {
           <div className="grid md:grid-cols-3 gap-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <Icon name="Disc3" className="text-primary" size={24} />
+                <img src="https://cdn.poehali.dev/projects/33951d59-5d7e-47f4-880f-c2ae98b9913e/files/48b2980d-2176-4462-8c7b-cb26e59aaf60.jpg" alt="OLPROD Logo" className="w-8 h-8 rounded-lg" />
                 <span className="font-bold text-lg">OLPROD</span>
               </div>
               <p className="text-sm text-muted-foreground">Профессиональная дистрибуция музыки на все платформы</p>
@@ -649,23 +805,31 @@ const Index = () => {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><button onClick={() => setActiveSection('platforms')}>Платформы</button></li>
                 <li><button onClick={() => requireAuth(() => setActiveSection('smartlinks'))}>Смартлинки</button></li>
-                <li><button onClick={() => setActiveSection('faq')}>FAQ</button></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold mb-4">Контакты</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>support@olprod.ru</li>
+                <li>olprodlabel@gmail.com</li>
               </ul>
             </div>
           </div>
           <div className="border-t mt-8 pt-8 text-center text-sm text-muted-foreground">
-            © 2024 OLPROD. Все права защищены.
+            © 2025 OLPROD. Все права защищены.
           </div>
         </div>
       </footer>
 
       <AISupportChat />
+
+      <a 
+        href="https://cdn.poehali.dev/projects/33951d59-5d7e-47f4-880f-c2ae98b9913e/files/48b2980d-2176-4462-8c7b-cb26e59aaf60.jpg" 
+        download="olprod-logo.jpg"
+        className="fixed bottom-24 left-4 bg-primary text-primary-foreground p-3 rounded-full shadow-lg hover:scale-110 transition-transform z-40"
+        title="Скачать логотип"
+      >
+        <Icon name="Download" size={20} />
+      </a>
     </div>
   );
 };
