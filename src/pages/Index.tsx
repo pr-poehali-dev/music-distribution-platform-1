@@ -35,6 +35,8 @@ interface Track {
   hasExplicitContent: boolean;
   audioFile?: File | null;
   audioFileName?: string;
+  lyricsText?: string;
+  artistName?: string;
 }
 
 interface Release {
@@ -49,6 +51,7 @@ interface Release {
   tracks: Track[];
   coverUrl?: string;
   isDeleted?: boolean;
+  artistName?: string;
 }
 
 interface SmartLink {
@@ -58,6 +61,7 @@ interface SmartLink {
   platforms: { name: string; url: string }[];
   coverUrl?: string;
   isDeleted?: boolean;
+  slug?: string;
 }
 
 const DRAFT_STORAGE_KEY = 'olprod_release_draft';
@@ -97,7 +101,8 @@ const Index = () => {
     title: '',
     genre: '',
     releaseDate: '',
-    upc: ''
+    upc: '',
+    artistName: ''
   });
 
   const [tracks, setTracks] = useState<Track[]>([
@@ -111,7 +116,9 @@ const Index = () => {
       isrc: '', 
       hasExplicitContent: false,
       audioFile: null,
-      audioFileName: ''
+      audioFileName: '',
+      lyricsText: '',
+      artistName: ''
     }
   ]);
   const [additionalArtistInput, setAdditionalArtistInput] = useState<{ [key: string]: string }>({});
@@ -379,7 +386,9 @@ const Index = () => {
       isrc: '',
       hasExplicitContent: false,
       audioFile: null,
-      audioFileName: ''
+      audioFileName: '',
+      lyricsText: '',
+      artistName: ''
     };
     setTracks([...tracks, newTrack]);
   };
@@ -514,13 +523,14 @@ const Index = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user.id,
-          releaseId: releaseId
+          releaseId: releaseId,
+          permanent: true
         })
       });
 
       if (response.ok) {
         setReleases(releases.filter(r => r.id !== releaseId));
-        toast({ title: 'Удалено', description: 'Релиз удалён навсегда' });
+        toast({ title: 'Удалено', description: 'Релиз полностью удалён из базы данных' });
       }
     } catch (error) {
       toast({ title: 'Ошибка', description: 'Ошибка удаления', variant: 'destructive' });
@@ -540,16 +550,26 @@ const Index = () => {
       return;
     }
 
+    const slug = `${newSmartLink.releaseName.toLowerCase().replace(/[^a-zа-я0-9]+/g, '-')}-${Date.now()}`;
+    
     const smartLink: SmartLink = {
       id: Date.now().toString(),
       releaseName: newSmartLink.releaseName,
       artistName: user?.artistName || '',
       platforms: validLinks,
       coverUrl: smartLinkCoverPreview || undefined,
-      isDeleted: false
+      isDeleted: false,
+      slug: slug
     };
 
-    setSmartLinks([smartLink, ...smartLinks]);
+    const updatedSmartLinks = [smartLink, ...smartLinks];
+    setSmartLinks(updatedSmartLinks);
+    
+    const savedLinks = localStorage.getItem('olprod_smartlinks');
+    const allLinks = savedLinks ? JSON.parse(savedLinks) : [];
+    allLinks.push(smartLink);
+    localStorage.setItem('olprod_smartlinks', JSON.stringify(allLinks));
+    
     setNewSmartLink({
       releaseName: '',
       platformLinks: [
@@ -562,7 +582,13 @@ const Index = () => {
     setSmartLinkCoverFile(null);
     setSmartLinkCoverPreview(null);
     setIsSmartLinkOpen(false);
-    toast({ title: 'Смартлинк создан!', description: 'Поделитесь ссылкой со слушателями' });
+    
+    const smartLinkUrl = `${window.location.origin}/smartlink/${slug}`;
+    navigator.clipboard.writeText(smartLinkUrl);
+    toast({ 
+      title: 'Смартлинк создан!', 
+      description: `Ссылка скопирована в буфер обмена` 
+    });
   };
 
   const handleDeleteSmartLink = (smartLinkId: string) => {
@@ -904,10 +930,30 @@ const Index = () => {
                           <SelectContent>
                             <SelectItem value="Pop">Pop</SelectItem>
                             <SelectItem value="Hip-Hop">Hip-Hop</SelectItem>
+                            <SelectItem value="Rap">Rap</SelectItem>
                             <SelectItem value="Rock">Rock</SelectItem>
+                            <SelectItem value="Alternative Rock">Alternative Rock</SelectItem>
+                            <SelectItem value="Indie Rock">Indie Rock</SelectItem>
                             <SelectItem value="Electronic">Electronic</SelectItem>
+                            <SelectItem value="House">House</SelectItem>
+                            <SelectItem value="Techno">Techno</SelectItem>
+                            <SelectItem value="Trance">Trance</SelectItem>
+                            <SelectItem value="Dubstep">Dubstep</SelectItem>
+                            <SelectItem value="Drum & Bass">Drum & Bass</SelectItem>
                             <SelectItem value="Jazz">Jazz</SelectItem>
+                            <SelectItem value="Blues">Blues</SelectItem>
                             <SelectItem value="Classical">Classical</SelectItem>
+                            <SelectItem value="R&B">R&B</SelectItem>
+                            <SelectItem value="Soul">Soul</SelectItem>
+                            <SelectItem value="Funk">Funk</SelectItem>
+                            <SelectItem value="Reggae">Reggae</SelectItem>
+                            <SelectItem value="Country">Country</SelectItem>
+                            <SelectItem value="Folk">Folk</SelectItem>
+                            <SelectItem value="Metal">Metal</SelectItem>
+                            <SelectItem value="Punk">Punk</SelectItem>
+                            <SelectItem value="Ambient">Ambient</SelectItem>
+                            <SelectItem value="Lo-Fi">Lo-Fi</SelectItem>
+                            <SelectItem value="Experimental">Experimental</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -928,6 +974,16 @@ const Index = () => {
                           value={newRelease.upc}
                           onChange={(e) => setNewRelease({...newRelease, upc: e.target.value})}
                         />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="release-artist">Исполнитель релиза</Label>
+                        <Input 
+                          id="release-artist"
+                          placeholder={user?.artistName || 'Имя исполнителя'}
+                          value={newRelease.artistName}
+                          onChange={(e) => setNewRelease({...newRelease, artistName: e.target.value})}
+                        />
+                        <p className="text-xs text-muted-foreground">Оставьте пустым для использования: {user?.artistName}</p>
                       </div>
                       <Button onClick={handleNextStep} className="w-full">
                         Далее
@@ -1028,6 +1084,15 @@ const Index = () => {
                                 />
                               </div>
                               <div className="space-y-2">
+                                <Label>Исполнитель трека</Label>
+                                <Input 
+                                  placeholder={user?.artistName || 'Имя исполнителя'}
+                                  value={track.artistName}
+                                  onChange={(e) => handleTrackChange(track.id, 'artistName', e.target.value)}
+                                />
+                                <p className="text-xs text-muted-foreground">Оставьте пустым для {user?.artistName}</p>
+                              </div>
+                              <div className="space-y-2">
                                 <Label>Аудиофайл WAV</Label>
                                 <Input 
                                   type="file"
@@ -1039,6 +1104,15 @@ const Index = () => {
                                     Загружено: {track.audioFileName}
                                   </p>
                                 )}
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Текст трека (лирика)</Label>
+                                <Textarea 
+                                  placeholder="Введите текст песни..."
+                                  value={track.lyricsText}
+                                  onChange={(e) => handleTrackChange(track.id, 'lyricsText', e.target.value)}
+                                  rows={6}
+                                />
                               </div>
                               <div className="flex items-center space-x-2">
                                 <Checkbox 
@@ -1157,6 +1231,14 @@ const Index = () => {
                                 />
                               </div>
                               <div className="space-y-2">
+                                <Label>Исполнитель трека</Label>
+                                <Input 
+                                  placeholder={user?.artistName || 'Имя исполнителя'}
+                                  value={track.artistName || ''}
+                                  onChange={(e) => handleEditTrackChange(track.id, 'artistName', e.target.value)}
+                                />
+                              </div>
+                              <div className="space-y-2">
                                 <Label>Аудиофайл WAV</Label>
                                 <Input 
                                   type="file"
@@ -1173,6 +1255,15 @@ const Index = () => {
                                     Загружено: {track.audioFileName}
                                   </p>
                                 )}
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Текст трека (лирика)</Label>
+                                <Textarea 
+                                  placeholder="Введите текст песни..."
+                                  value={track.lyricsText || ''}
+                                  onChange={(e) => handleEditTrackChange(track.id, 'lyricsText', e.target.value)}
+                                  rows={6}
+                                />
                               </div>
                               <div className="flex items-center space-x-2">
                                 <Checkbox 
@@ -1452,6 +1543,18 @@ const Index = () => {
                                   <div>
                                     <h3 className="font-semibold text-lg">{link.releaseName}</h3>
                                     <p className="text-sm text-muted-foreground">{link.artistName}</p>
+                                    {link.slug && (
+                                      <button
+                                        onClick={() => {
+                                          const url = `${window.location.origin}/smartlink/${link.slug}`;
+                                          navigator.clipboard.writeText(url);
+                                          toast({ title: 'Скопировано!', description: 'Ссылка скопирована в буфер обмена' });
+                                        }}
+                                        className="text-xs text-primary hover:underline mt-1"
+                                      >
+                                        Скопировать ссылку
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                                 <Button 
@@ -1549,7 +1652,7 @@ const Index = () => {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {platforms.slice(0, 4).map((platform, i) => {
-                      const percent = Math.floor(Math.random() * 40) + 10;
+                      const percent = 0;
                       return (
                         <div key={platform.name} className="space-y-2">
                           <div className="flex justify-between text-sm">

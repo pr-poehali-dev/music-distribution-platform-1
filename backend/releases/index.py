@@ -204,6 +204,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             body_data = json.loads(event.get('body', '{}'))
             release_id = body_data.get('releaseId')
             user_id = body_data.get('userId')
+            permanent = body_data.get('permanent', False)
             
             if not release_id or not user_id:
                 return {
@@ -213,8 +214,22 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'isBase64Encoded': False
                 }
             
-            with conn.cursor() as cur:
-                cur.execute("UPDATE releases SET status = 'Удалён' WHERE id = %s AND user_id = %s", (release_id, user_id))
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                if permanent:
+                    cur.execute("DELETE FROM release_tracks WHERE release_id = %s", (release_id,))
+                    cur.execute("DELETE FROM releases WHERE id = %s AND user_id = %s RETURNING id", (release_id, user_id))
+                    result = cur.fetchone()
+                    
+                    if not result:
+                        return {
+                            'statusCode': 404,
+                            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                            'body': json.dumps({'error': 'Release not found'}),
+                            'isBase64Encoded': False
+                        }
+                else:
+                    cur.execute("UPDATE releases SET status = 'Удалён' WHERE id = %s AND user_id = %s", (release_id, user_id))
+                
                 conn.commit()
                 
                 return {
