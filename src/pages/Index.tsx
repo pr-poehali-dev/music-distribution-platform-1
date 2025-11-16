@@ -265,7 +265,8 @@ const Index = () => {
         setCurrentReleaseId(data.release.id);
         setIsUploadOpen(false);
         setIsAudioUploadOpen(true);
-        setNewRelease({ title: '', genre: '', releaseDate: '', description: '', musicAuthor: '', lyricsAuthor: '' });
+        setNewRelease({ title: '', genre: '', releaseDate: '', description: '', musicAuthor: '', lyricsAuthor: '', featuredArtists: [] });
+        setFeaturedArtistInput('');
       } else {
         toast({ title: 'Ошибка', description: data.error || 'Ошибка создания', variant: 'destructive' });
       }
@@ -477,7 +478,7 @@ const Index = () => {
               <>
                 <Dialog open={isAuthOpen} onOpenChange={setIsAuthOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="ghost" size="sm">Вход</Button>
+                    <Button size="sm" className="glass-button">Вход</Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md">
                     <DialogHeader>
@@ -549,9 +550,6 @@ const Index = () => {
                     </Tabs>
                   </DialogContent>
                 </Dialog>
-                <Button size="sm" onClick={() => setIsAuthOpen(true)} className="hover:scale-105 transition-transform">
-                  Начать бесплатно
-                </Button>
               </>
             ) : (
               <>
@@ -725,6 +723,60 @@ const Index = () => {
                               value={newRelease.lyricsAuthor}
                               onChange={(e) => setNewRelease({ ...newRelease, lyricsAuthor: e.target.value })}
                             />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Другие артисты (feat.)</Label>
+                            <div className="flex gap-2">
+                              <Input 
+                                placeholder="Имя артиста"
+                                value={featuredArtistInput}
+                                onChange={(e) => setFeaturedArtistInput(e.target.value)}
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter' && featuredArtistInput.trim()) {
+                                    setNewRelease({ 
+                                      ...newRelease, 
+                                      featuredArtists: [...newRelease.featuredArtists, featuredArtistInput.trim()] 
+                                    });
+                                    setFeaturedArtistInput('');
+                                  }
+                                }}
+                              />
+                              <Button 
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                  if (featuredArtistInput.trim()) {
+                                    setNewRelease({ 
+                                      ...newRelease, 
+                                      featuredArtists: [...newRelease.featuredArtists, featuredArtistInput.trim()] 
+                                    });
+                                    setFeaturedArtistInput('');
+                                  }
+                                }}
+                              >
+                                <Icon name="Plus" size={18} />
+                              </Button>
+                            </div>
+                            {newRelease.featuredArtists.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {newRelease.featuredArtists.map((artist, idx) => (
+                                  <Badge key={idx} variant="secondary" className="flex items-center gap-1">
+                                    {artist}
+                                    <button
+                                      onClick={() => {
+                                        setNewRelease({
+                                          ...newRelease,
+                                          featuredArtists: newRelease.featuredArtists.filter((_, i) => i !== idx)
+                                        });
+                                      }}
+                                      className="ml-1"
+                                    >
+                                      <Icon name="X" size={12} />
+                                    </button>
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="description">Описание</Label>
@@ -980,7 +1032,7 @@ const Index = () => {
                       Spotify, Apple Music, VK, Яндекс Музыка и ещё 150+ площадок. Загружайте релизы, получайте статистику и выводите деньги
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                      <Button size="lg" className="text-lg px-8 hover:scale-105 transition-transform" onClick={() => requireAuth(() => setIsUploadOpen(true))}>
+                      <Button size="lg" className="text-lg px-8 glass-button" onClick={() => setIsAuthOpen(true)}>
                         Попробовать
                         <Icon name="Sparkles" size={20} className="ml-2" />
                       </Button>
@@ -1169,15 +1221,6 @@ const Index = () => {
       </footer>
 
       <AISupportChat />
-
-      <a 
-        href="https://cdn.poehali.dev/projects/33951d59-5d7e-47f4-880f-c2ae98b9913e/files/dc7a385c-d082-4a5b-89e7-4ee95e93f99c.jpg" 
-        download="olprod-logo.jpg"
-        className="fixed bottom-24 left-4 bg-primary text-primary-foreground p-3 rounded-full shadow-lg hover:scale-110 transition-transform z-40"
-        title="Скачать логотип"
-      >
-        <Icon name="Download" size={20} />
-      </a>
     </div>
   );
 };
