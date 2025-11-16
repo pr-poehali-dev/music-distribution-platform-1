@@ -34,6 +34,18 @@
         "success": true
       },
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "Reset password validation",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "reset_password",
+        "email": "",
+        "newPassword": ""
+      },
+      "expectedStatus": 400,
+      "bodyMatcher": "partial"
     }
   ]
 }

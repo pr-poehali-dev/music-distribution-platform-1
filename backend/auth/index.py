@@ -92,6 +92,42 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'isBase64Encoded': False
                 }
         
+        elif action == 'reset_password':
+            email = body_data.get('email', '').strip()
+            new_password = body_data.get('newPassword', '')
+            
+            if not email or not new_password:
+                return {
+                    'statusCode': 400,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'error': 'Заполните все поля'}),
+                    'isBase64Encoded': False
+                }
+            
+            password_hash = hash_password(new_password)
+            
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+                user = cur.fetchone()
+                
+                if not user:
+                    return {
+                        'statusCode': 400,
+                        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                        'body': json.dumps({'error': 'Email не зарегистрирован'}),
+                        'isBase64Encoded': False
+                    }
+                
+                cur.execute("UPDATE users SET password_hash = %s WHERE email = %s", (password_hash, email))
+                conn.commit()
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    'body': json.dumps({'success': True, 'message': 'Пароль успешно изменён'}),
+                    'isBase64Encoded': False
+                }
+        
         elif action == 'login':
             email = body_data.get('email', '').strip()
             password = body_data.get('password', '')

@@ -33,6 +33,8 @@ interface Track {
   additionalArtists: string[];
   isrc?: string;
   hasExplicitContent: boolean;
+  audioFile?: File | null;
+  audioFileName?: string;
 }
 
 interface Release {
@@ -68,6 +70,9 @@ const Index = () => {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [isSmartLinkOpen, setIsSmartLinkOpen] = useState(false);
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+  const [isEditReleaseOpen, setIsEditReleaseOpen] = useState(false);
+  const [editingRelease, setEditingRelease] = useState<Release | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark' | 'crystal' | 'blue'>('light');
   const [releases, setReleases] = useState<Release[]>([]);
@@ -76,9 +81,14 @@ const Index = () => {
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [regArtistName, setRegArtistName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
 
   const [withdrawCardNumber, setWithdrawCardNumber] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
@@ -99,7 +109,9 @@ const Index = () => {
       producer: '', 
       additionalArtists: [], 
       isrc: '', 
-      hasExplicitContent: false 
+      hasExplicitContent: false,
+      audioFile: null,
+      audioFileName: ''
     }
   ]);
   const [additionalArtistInput, setAdditionalArtistInput] = useState<{ [key: string]: string }>({});
@@ -164,7 +176,7 @@ const Index = () => {
   const deletedReleases = releases.filter(r => r.isDeleted);
   const activeSmartLinks = smartLinks.filter(s => !s.isDeleted);
   const deletedSmartLinks = smartLinks.filter(s => s.isDeleted);
-  const totalRevenue = activeReleases.reduce((sum, r) => sum + r.revenue, 0);
+  const totalRevenue = 0;
   const totalStreams = activeReleases.reduce((sum, r) => sum + r.streams, 0);
 
   const validateCoverImage = async (file: File, requiredSize: number = 3000): Promise<boolean> => {
@@ -295,6 +307,38 @@ const Index = () => {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!resetEmail || !resetNewPassword) {
+      toast({ title: 'Ошибка', description: 'Заполните все поля', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      const response = await fetch(API_AUTH, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'reset_password', 
+          email: resetEmail, 
+          newPassword: resetNewPassword
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setIsForgotPasswordOpen(false);
+        setResetEmail('');
+        setResetNewPassword('');
+        toast({ title: 'Успешно!', description: 'Пароль успешно изменён' });
+      } else {
+        toast({ title: 'Ошибка', description: data.error || 'Ошибка смены пароля', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка', description: 'Ошибка соединения', variant: 'destructive' });
+    }
+  };
+
   const handleLogout = () => {
     setUser(null);
     setReleases([]);
@@ -333,9 +377,33 @@ const Index = () => {
       producer: '',
       additionalArtists: [],
       isrc: '',
-      hasExplicitContent: false
+      hasExplicitContent: false,
+      audioFile: null,
+      audioFileName: ''
     };
     setTracks([...tracks, newTrack]);
+  };
+
+  const handleTrackAudioChange = (trackId: string, file: File | null) => {
+    if (file && !file.name.toLowerCase().endsWith('.wav')) {
+      toast({ title: 'Ошибка', description: 'Загружайте только WAV файлы', variant: 'destructive' });
+      return;
+    }
+    setTracks(tracks.map(t => t.id === trackId ? { ...t, audioFile: file, audioFileName: file?.name || '' } : t));
+  };
+
+  const handleEditRelease = (release: Release) => {
+    setEditingRelease(release);
+    setIsEditReleaseOpen(true);
+  };
+
+  const handleSaveEditedRelease = () => {
+    if (!editingRelease) return;
+    
+    setReleases(releases.map(r => r.id === editingRelease.id ? editingRelease : r));
+    setIsEditReleaseOpen(false);
+    setEditingRelease(null);
+    toast({ title: 'Сохранено', description: 'Изменения сохранены' });
   };
 
   const handleRemoveTrack = (trackId: string) => {
@@ -348,6 +416,12 @@ const Index = () => {
 
   const handleTrackChange = (trackId: string, field: keyof Track, value: any) => {
     setTracks(tracks.map(t => t.id === trackId ? { ...t, [field]: value } : t));
+  };
+
+  const handleEditTrackChange = (trackId: string, field: keyof Track, value: any) => {
+    if (!editingRelease) return;
+    const updatedTracks = editingRelease.tracks.map(t => t.id === trackId ? { ...t, [field]: value } : t);
+    setEditingRelease({ ...editingRelease, tracks: updatedTracks });
   };
 
   const handleAddAdditionalArtist = (trackId: string) => {
@@ -628,15 +702,36 @@ const Index = () => {
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="password">Пароль</Label>
-                          <Input 
-                            id="password" 
-                            type="password"
-                            value={loginPassword}
-                            onChange={(e) => setLoginPassword(e.target.value)}
-                          />
+                          <div className="relative">
+                            <Input 
+                              id="password" 
+                              type={showLoginPassword ? "text" : "password"}
+                              value={loginPassword}
+                              onChange={(e) => setLoginPassword(e.target.value)}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3"
+                              onClick={() => setShowLoginPassword(!showLoginPassword)}
+                            >
+                              <Icon name={showLoginPassword ? "EyeOff" : "Eye"} size={16} />
+                            </Button>
+                          </div>
                         </div>
                         <Button className="w-full" onClick={handleLogin}>
                           Войти
+                        </Button>
+                        <Button 
+                          variant="link" 
+                          className="w-full text-sm" 
+                          onClick={() => {
+                            setIsAuthOpen(false);
+                            setIsForgotPasswordOpen(true);
+                          }}
+                        >
+                          Забыли пароль?
                         </Button>
                       </TabsContent>
                       <TabsContent value="register" className="space-y-4">
@@ -661,18 +756,83 @@ const Index = () => {
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="reg-password">Пароль *</Label>
-                          <Input 
-                            id="reg-password" 
-                            type="password"
-                            value={regPassword}
-                            onChange={(e) => setRegPassword(e.target.value)}
-                          />
+                          <div className="relative">
+                            <Input 
+                              id="reg-password" 
+                              type={showRegPassword ? "text" : "password"}
+                              value={regPassword}
+                              onChange={(e) => setRegPassword(e.target.value)}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3"
+                              onClick={() => setShowRegPassword(!showRegPassword)}
+                            >
+                              <Icon name={showRegPassword ? "EyeOff" : "Eye"} size={16} />
+                            </Button>
+                          </div>
                         </div>
                         <Button className="w-full" onClick={handleRegister}>
                           Создать аккаунт
                         </Button>
                       </TabsContent>
                     </Tabs>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={isForgotPasswordOpen} onOpenChange={setIsForgotPasswordOpen}>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Восстановление пароля</DialogTitle>
+                      <DialogDescription>Введите email и новый пароль</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="reset-email">Email</Label>
+                        <Input 
+                          id="reset-email" 
+                          type="email" 
+                          placeholder="your@email.com"
+                          value={resetEmail}
+                          onChange={(e) => setResetEmail(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="reset-password">Новый пароль</Label>
+                        <div className="relative">
+                          <Input 
+                            id="reset-password" 
+                            type={showResetPassword ? "text" : "password"}
+                            value={resetNewPassword}
+                            onChange={(e) => setResetNewPassword(e.target.value)}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3"
+                            onClick={() => setShowResetPassword(!showResetPassword)}
+                          >
+                            <Icon name={showResetPassword ? "EyeOff" : "Eye"} size={16} />
+                          </Button>
+                        </div>
+                      </div>
+                      <Button className="w-full" onClick={handleResetPassword}>
+                        Изменить пароль
+                      </Button>
+                      <Button 
+                        variant="link" 
+                        className="w-full text-sm" 
+                        onClick={() => {
+                          setIsForgotPasswordOpen(false);
+                          setIsAuthOpen(true);
+                        }}
+                      >
+                        Вернуться ко входу
+                      </Button>
+                    </div>
                   </DialogContent>
                 </Dialog>
               </>
@@ -867,6 +1027,19 @@ const Index = () => {
                                   onChange={(e) => handleTrackChange(track.id, 'isrc', e.target.value)}
                                 />
                               </div>
+                              <div className="space-y-2">
+                                <Label>Аудиофайл WAV</Label>
+                                <Input 
+                                  type="file"
+                                  accept=".wav"
+                                  onChange={(e) => handleTrackAudioChange(track.id, e.target.files?.[0] || null)}
+                                />
+                                {track.audioFileName && (
+                                  <p className="text-sm text-muted-foreground">
+                                    Загружено: {track.audioFileName}
+                                  </p>
+                                )}
+                              </div>
                               <div className="flex items-center space-x-2">
                                 <Checkbox 
                                   id={`explicit-${track.id}`}
@@ -922,6 +1095,103 @@ const Index = () => {
                           Отправить на модерацию
                         </Button>
                       </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={isEditReleaseOpen} onOpenChange={setIsEditReleaseOpen}>
+                <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Редактировать релиз</DialogTitle>
+                    <DialogDescription>Изменить информацию о треках</DialogDescription>
+                  </DialogHeader>
+                  {editingRelease && (
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <h3 className="font-semibold">{editingRelease.title}</h3>
+                        <p className="text-sm text-muted-foreground">{editingRelease.genre}</p>
+                      </div>
+                      <div className="space-y-4">
+                        {editingRelease.tracks.map((track, index) => (
+                          <Card key={track.id} className={theme === 'crystal' ? 'glass-card' : ''}>
+                            <CardHeader>
+                              <CardTitle className="text-base">Трек {index + 1}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <div className="space-y-2">
+                                <Label>Название трека</Label>
+                                <Input 
+                                  value={track.title}
+                                  onChange={(e) => handleEditTrackChange(track.id, 'title', e.target.value)}
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-2">
+                                  <Label>Автор слов</Label>
+                                  <Input 
+                                    value={track.lyricsAuthor || ''}
+                                    onChange={(e) => handleEditTrackChange(track.id, 'lyricsAuthor', e.target.value)}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Автор музыки</Label>
+                                  <Input 
+                                    value={track.musicAuthor || ''}
+                                    onChange={(e) => handleEditTrackChange(track.id, 'musicAuthor', e.target.value)}
+                                  />
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Продюсер</Label>
+                                <Input 
+                                  value={track.producer || ''}
+                                  onChange={(e) => handleEditTrackChange(track.id, 'producer', e.target.value)}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>ISRC</Label>
+                                <Input 
+                                  value={track.isrc || ''}
+                                  onChange={(e) => handleEditTrackChange(track.id, 'isrc', e.target.value)}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Аудиофайл WAV</Label>
+                                <Input 
+                                  type="file"
+                                  accept=".wav"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      handleEditTrackChange(track.id, 'audioFileName', file.name);
+                                    }
+                                  }}
+                                />
+                                {track.audioFileName && (
+                                  <p className="text-sm text-muted-foreground">
+                                    Загружено: {track.audioFileName}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Checkbox 
+                                  id={`edit-explicit-${track.id}`}
+                                  checked={track.hasExplicitContent}
+                                  onCheckedChange={(checked) => handleEditTrackChange(track.id, 'hasExplicitContent', checked)}
+                                />
+                                <Label htmlFor={`edit-explicit-${track.id}`} className="cursor-pointer">
+                                  Содержит ненормативную лексику
+                                </Label>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                      <Button className="w-full" onClick={handleSaveEditedRelease}>
+                        <Icon name="Save" size={18} className="mr-2" />
+                        Сохранить изменения
+                      </Button>
                     </div>
                   )}
                 </DialogContent>
@@ -1057,8 +1327,15 @@ const Index = () => {
                               </div>
                               <div className="text-right">
                                 <div className="text-sm text-muted-foreground">Доход</div>
-                                <div className="text-xl font-bold">{release.revenue}₽</div>
+                                <div className="text-xl font-bold">0₽</div>
                               </div>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => handleEditRelease(release)}
+                              >
+                                <Icon name="Pencil" size={18} />
+                              </Button>
                               <Button 
                                 variant="ghost" 
                                 size="icon"
@@ -1297,7 +1574,7 @@ const Index = () => {
                         {activeReleases.filter(r => r.status === 'Опубликован').map((release) => (
                           <div key={release.id} className="flex items-center justify-between">
                             <span className="text-sm">{release.title}</span>
-                            <span className="text-sm font-semibold">{release.revenue}₽</span>
+                            <span className="text-sm font-semibold">0₽</span>
                           </div>
                         ))}
                       </div>
