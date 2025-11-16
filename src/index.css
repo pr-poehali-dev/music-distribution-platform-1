@@ -151,3 +151,104 @@
       sans-serif;
   }
 }
+
+@keyframes liquid-glass {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+  25% {
+    transform: translateY(-5px) scale(1.02);
+    filter: blur(2px);
+  }
+  50% {
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+  75% {
+    transform: translateY(5px) scale(0.98);
+    filter: blur(2px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 200%;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(139, 92, 246, 0.6);
+  }
+}
+
+.glass-card {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.05)
+  );
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  animation: liquid-glass 4s ease-in-out infinite;
+}
+
+.glass-button {
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.8),
+    rgba(139, 92, 246, 0.6)
+  );
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+.glass-button::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  transition: left 0.5s;
+}
+
+.glass-button:hover::before {
+  left: 100%;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}

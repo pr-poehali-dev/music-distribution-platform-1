@@ -72,8 +72,10 @@ const Index = () => {
     releaseDate: '',
     description: '',
     musicAuthor: '',
-    lyricsAuthor: ''
+    lyricsAuthor: '',
+    featuredArtists: [] as string[]
   });
+  const [featuredArtistInput, setFeaturedArtistInput] = useState('');
 
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -594,7 +596,7 @@ const Index = () => {
 
               <TabsContent value="releases" className="space-y-6">
                 <div className="grid md:grid-cols-3 gap-6">
-                  <Card>
+                  <Card className="glass-card">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm font-medium text-muted-foreground">Всего прослушиваний</CardTitle>
                     </CardHeader>
@@ -602,7 +604,7 @@ const Index = () => {
                       <div className="text-3xl font-bold">{totalStreams.toLocaleString()}</div>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="glass-card">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm font-medium text-muted-foreground">Доход</CardTitle>
                     </CardHeader>
@@ -611,7 +613,7 @@ const Index = () => {
                       <p className="text-xs text-muted-foreground mt-1">Мин. вывод: 100₽</p>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="glass-card">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm font-medium text-muted-foreground">Активных релизов</CardTitle>
                     </CardHeader>
@@ -908,9 +910,13 @@ const Index = () => {
                         <CardContent className="p-6">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                              <div className="w-16 h-16 bg-gradient-to-br from-primary/30 to-secondary/30 rounded-lg flex items-center justify-center">
-                                <Icon name="Music" className="text-primary" size={28} />
-                              </div>
+                              {release.coverUrl ? (
+                                <img src={release.coverUrl} alt={release.title} className="w-16 h-16 rounded-lg object-cover" />
+                              ) : (
+                                <div className="w-16 h-16 bg-gradient-to-br from-primary/30 to-secondary/30 rounded-lg flex items-center justify-center">
+                                  <Icon name="Music" className="text-primary" size={28} />
+                                </div>
+                              )}
                               <div>
                                 <h3 className="font-semibold text-lg">{release.title}</h3>
                                 <p className="text-sm text-muted-foreground mb-1">{user.artistName}</p>
@@ -1044,7 +1050,7 @@ const Index = () => {
               <section className="py-16 border-t">
                 <div className="container mx-auto px-4">
                   <div className="grid md:grid-cols-3 gap-8">
-                    <Card className="text-center hover:shadow-lg transition-all hover:-translate-y-1">
+                    <Card className="text-center glass-card hover:shadow-lg transition-all hover:-translate-y-1">
                       <CardHeader>
                         <div className="mx-auto w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
                           <Icon name="Zap" className="text-primary" size={24} />
@@ -1056,9 +1062,9 @@ const Index = () => {
                       </CardContent>
                     </Card>
 
-                    <Card className="text-center hover:shadow-lg transition-all hover:-translate-y-1">
+                    <Card className="text-center glass-card hover:shadow-lg transition-all hover:-translate-y-1">
                       <CardHeader>
-                        <div className="mx-auto w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                        <div className="mx-auto w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4 animate-float">
                           <Icon name="BarChart3" className="text-primary" size={24} />
                         </div>
                         <CardTitle>Детальная аналитика</CardTitle>
@@ -1068,9 +1074,9 @@ const Index = () => {
                       </CardContent>
                     </Card>
 
-                    <Card className="text-center hover:shadow-lg transition-all hover:-translate-y-1">
+                    <Card className="text-center glass-card hover:shadow-lg transition-all hover:-translate-y-1">
                       <CardHeader>
-                        <div className="mx-auto w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                        <div className="mx-auto w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4 animate-float">
                           <Icon name="Wallet" className="text-primary" size={24} />
                         </div>
                         <CardTitle>Прозрачные выплаты</CardTitle>
