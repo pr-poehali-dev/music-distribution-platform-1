@@ -1042,7 +1042,7 @@ const Index = () => {
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 max-w-4xl mx-auto">
                   {platforms.map((platform) => (
-                    <Card key={platform.name} className="text-center hover:shadow-lg transition-all hover:-translate-y-1">
+                    <Card key={platform.name} className="text-center glass-card transition-all hover:-translate-y-1">
                       <CardContent className="pt-6 pb-6">
                         <Icon name={platform.icon as any} className="mx-auto mb-3 text-primary" size={32} />
                         <p className="text-sm font-medium">{platform.name}</p>
