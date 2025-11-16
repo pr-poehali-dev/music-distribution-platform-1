@@ -36,6 +36,8 @@ interface Release {
   lyricsAuthor?: string;
   audioUrl?: string;
   coverUrl?: string;
+  audioFiles?: Array<{ id: number; filename: string; duration?: string }>;
+  deleted?: boolean;
 }
 
 interface SmartLink {
@@ -77,8 +79,9 @@ const Index = () => {
   });
   const [featuredArtistInput, setFeaturedArtistInput] = useState('');
 
-  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioFiles, setAudioFiles] = useState<Array<{ id: number; file: File; filename: string }>>([]);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [deletedReleases, setDeletedReleases] = useState<Release[]>([]);
 
   const [newSmartLink, setNewSmartLink] = useState({
     releaseName: '',
@@ -152,10 +155,34 @@ const Index = () => {
   };
 
   const handleAudioChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && validateAudioFile(file)) {
-      setAudioFile(file);
+    const files = Array.from(e.target.files || []);
+    const validFiles: Array<{ id: number; file: File; filename: string }> = [];
+    
+    for (const file of files) {
+      if (validateAudioFile(file)) {
+        validFiles.push({
+          id: Date.now() + Math.random(),
+          file,
+          filename: file.name
+        });
+      }
     }
+    
+    const newTotal = audioFiles.length + validFiles.length;
+    if (newTotal > 10) {
+      toast({ 
+        title: 'Лимит превышен', 
+        description: `Можно добавить максимум 10 файлов. У вас уже ${audioFiles.length}`,
+        variant: 'destructive' 
+      });
+      return;
+    }
+    
+    setAudioFiles([...audioFiles, ...validFiles]);
+  };
+
+  const handleRemoveAudioFile = (id: number) => {
+    setAudioFiles(audioFiles.filter(f => f.id !== id));
   };
 
   const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -277,15 +304,14 @@ const Index = () => {
     }
   };
 
-  const handleUploadFiles = async () => {
-    if (!audioFile || !coverFile) {
-      toast({ title: 'Ошибка', description: 'Загрузите аудио и обложку', variant: 'destructive' });
-      return;
-    }
+  const handleImportFiles = () => {
+    window.open('http://olprodistr.com.tilda.ws/gryz', '_blank');
+  };
 
+  const handleSubmitToModeration = async () => {
     if (!currentReleaseId || !user) return;
 
-    toast({ title: 'Загрузка...', description: 'Файлы загружаются на сервер' });
+    toast({ title: 'Отправка...', description: 'Релиз отправляется на модерацию' });
 
     try {
       const response = await fetch(API_RELEASES, {
@@ -295,21 +321,19 @@ const Index = () => {
           userId: user.id,
           releaseId: currentReleaseId,
           status: 'На модерации',
-          audioUrl: audioFile.name,
-          coverUrl: coverFile.name
+          audioFiles: audioFiles.map(f => ({ filename: f.filename }))
         })
       });
 
       if (response.ok) {
         setIsAudioUploadOpen(false);
-        setAudioFile(null);
-        setCoverFile(null);
+        setAudioFiles([]);
         setCurrentReleaseId(null);
         loadReleases();
         toast({ title: 'Успешно!', description: 'Релиз отправлен на модерацию' });
       }
     } catch (error) {
-      toast({ title: 'Ошибка', description: 'Ошибка загрузки файлов', variant: 'destructive' });
+      toast({ title: 'Ошибка', description: 'Ошибка отправки релиза', variant: 'destructive' });
     }
   };
 
@@ -353,6 +377,11 @@ const Index = () => {
 
     if (!confirm('Удалить этот релиз?')) return;
 
+    const releaseToDelete = releases.find(r => r.id === releaseId);
+    if (releaseToDelete) {
+      setDeletedReleases([...deletedReleases, { ...releaseToDelete, deleted: true }]);
+    }
+
     try {
       const response = await fetch(API_RELEASES, {
         method: 'DELETE',
@@ -365,10 +394,34 @@ const Index = () => {
 
       if (response.ok) {
         loadReleases();
-        toast({ title: 'Успешно!', description: 'Релиз удалён' });
+        toast({ title: 'Успешно!', description: 'Релиз удалён. Вы можете восстановить его из корзины' });
       }
     } catch (error) {
       toast({ title: 'Ошибка', description: 'Ошибка удаления', variant: 'destructive' });
+    }
+  };
+
+  const handleRestoreRelease = async (releaseId: number) => {
+    if (!user) return;
+
+    try {
+      const response = await fetch(API_RELEASES, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          releaseId: releaseId,
+          restore: true
+        })
+      });
+
+      if (response.ok) {
+        setDeletedReleases(deletedReleases.filter(r => r.id !== releaseId));
+        loadReleases();
+        toast({ title: 'Успешно!', description: 'Релиз восстановлен' });
+      }
+    } catch (error) {
+      toast({ title: 'Ошибка', description: 'Ошибка восстановления', variant: 'destructive' });
     }
   };
 
@@ -415,10 +468,9 @@ const Index = () => {
       return;
     }
 
-    const mailtoLink = `mailto:olprodlabel@gmail.com?subject=Запрос на вывод средств&body=Артист: ${user?.artistName}%0AEmail: ${user?.email}%0AСумма: ${totalRevenue}₽`;
-    window.location.href = mailtoLink;
+    window.open('http://olprodistr.com.tilda.ws/vivod', '_blank');
     setIsWithdrawOpen(false);
-    toast({ title: 'Запрос отправлен', description: 'Мы свяжемся с вами в течение 1-2 дней' });
+    toast({ title: 'Переход к выводу', description: 'Заполните форму для вывода средств' });
   };
 
   const requireAuth = (action: () => void) => {
@@ -432,7 +484,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background transition-colors duration-300">
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-50 border-b bg-background/95 supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <DropdownMenu>
@@ -592,6 +644,12 @@ const Index = () => {
               <TabsList>
                 <TabsTrigger value="releases">Релизы</TabsTrigger>
                 <TabsTrigger value="analytics">Аналитика</TabsTrigger>
+                <TabsTrigger value="trash">
+                  Корзина
+                  {deletedReleases.length > 0 && (
+                    <Badge variant="destructive" className="ml-2">{deletedReleases.length}</Badge>
+                  )}
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="releases" className="space-y-6">
@@ -799,33 +857,61 @@ const Index = () => {
                 </div>
 
                 <Dialog open={isAudioUploadOpen} onOpenChange={setIsAudioUploadOpen}>
-                  <DialogContent className="sm:max-w-lg">
+                  <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                      <DialogTitle>Загрузка файлов</DialogTitle>
-                      <DialogDescription>Загрузите аудио и обложку для вашего релиза</DialogDescription>
+                      <DialogTitle>Добавление аудио</DialogTitle>
+                      <DialogDescription>Добавьте до 10 аудиофайлов (WAV)</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="audio-file">Аудио файл (WAV) *</Label>
+                        <Label htmlFor="audio-files">Аудио файлы (WAV, макс 10) *</Label>
                         <Input 
-                          id="audio-file" 
+                          id="audio-files" 
                           type="file"
                           accept=".wav"
+                          multiple
                           onChange={handleAudioChange}
                         />
-                        {audioFile && <p className="text-sm text-green-600">✓ {audioFile.name}</p>}
+                        <p className="text-xs text-muted-foreground">Добавлено: {audioFiles.length} / 10</p>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="cover-file">Обложка (квадратная) *</Label>
-                        <Input 
-                          id="cover-file" 
-                          type="file"
-                          accept="image/*"
-                          onChange={handleCoverChange}
-                        />
-                        {coverFile && <p className="text-sm text-green-600">✓ {coverFile.name}</p>}
+                      
+                      {audioFiles.length > 0 && (
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {audioFiles.map((file) => (
+                            <div key={file.id} className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <Icon name="Music" size={16} />
+                                <span className="text-sm">{file.filename}</span>
+                              </div>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-6 w-6"
+                                onClick={() => handleRemoveAudioFile(file.id)}
+                              >
+                                <Icon name="X" size={14} />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          className="flex-1" 
+                          onClick={handleImportFiles}
+                        >
+                          <Icon name="Download" size={18} className="mr-2" />
+                          Импорт обложек и аудио
+                        </Button>
                       </div>
-                      <Button className="w-full" onClick={handleUploadFiles} disabled={!audioFile || !coverFile}>
+
+                      <Button 
+                        className="w-full" 
+                        onClick={handleSubmitToModeration} 
+                        disabled={audioFiles.length === 0}
+                      >
                         Отправить на модерацию
                       </Button>
                     </div>
@@ -944,7 +1030,10 @@ const Index = () => {
                                 </div>
                               )}
                               {release.status === 'Черновик' && (
-                                <Button variant="outline" size="sm" onClick={() => setIsAudioUploadOpen(true)}>
+                                <Button variant="outline" size="sm" onClick={() => {
+                                  setCurrentReleaseId(release.id);
+                                  setIsAudioUploadOpen(true);
+                                }}>
                                   Продолжить
                                 </Button>
                               )}
@@ -1017,6 +1106,60 @@ const Index = () => {
                     </CardContent>
                   </Card>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="trash" className="space-y-6">
+                {deletedReleases.length === 0 ? (
+                  <Card>
+                    <CardContent className="p-12 text-center">
+                      <Icon name="Trash2" className="mx-auto mb-4 text-muted-foreground" size={48} />
+                      <h3 className="text-xl font-semibold mb-2">Корзина пуста</h3>
+                      <p className="text-muted-foreground">Удалённые релизы будут храниться здесь</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-4">
+                    {deletedReleases.map((release) => (
+                      <Card key={release.id} className="opacity-60 hover:opacity-100 transition-opacity">
+                        <CardContent className="p-6">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              {release.coverUrl ? (
+                                <img src={release.coverUrl} alt={release.title} className="w-16 h-16 rounded-lg object-cover grayscale" />
+                              ) : (
+                                <div className="w-16 h-16 bg-gradient-to-br from-muted to-muted/50 rounded-lg flex items-center justify-center">
+                                  <Icon name="Music" className="text-muted-foreground" size={28} />
+                                </div>
+                              )}
+                              <div>
+                                <h3 className="font-semibold text-lg">{release.title}</h3>
+                                <p className="text-sm text-muted-foreground mb-1">{user.artistName}</p>
+                                <div className="flex items-center gap-3">
+                                  <Badge variant="outline" className="text-destructive">
+                                    Удалён
+                                  </Badge>
+                                  {release.genre && (
+                                    <span className="text-sm text-muted-foreground">{release.genre}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleRestoreRelease(release.id)}
+                              >
+                                <Icon name="RotateCcw" size={16} className="mr-2" />
+                                Восстановить
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
           </div>
